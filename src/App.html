@@ -1,0 +1,493 @@
+<script>
+(function () {
+  const { createApp } = Vue;
+  const LS = {
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+    del(k) { try { localStorage.removeItem(k); } catch (e) {} },
+  };
+  const isTrue = v => v === true || String(v).toLowerCase() === 'true' || v === '1';
+  const pad = n => String(n).padStart(2, '0');
+  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  function parseD(v) {
+    if (!v) return null;
+    const s = String(v);
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(s) ? new Date(s + 'T00:00:00') : new Date(s);
+    return isNaN(d) ? null : d;
+  }
+  const FIELD_TYPES = [
+    { v: 'text', l: 'Teks singkat' }, { v: 'textarea', l: 'Paragraf' }, { v: 'number', l: 'Angka' },
+    { v: 'email', l: 'Email' }, { v: 'tel', l: 'Telepon' }, { v: 'url', l: 'URL / Link' }, { v: 'date', l: 'Tanggal' },
+    { v: 'select', l: 'Dropdown (pilih satu)' }, { v: 'radio', l: 'Pilihan ganda (radio)' }, { v: 'checkbox', l: 'Kotak centang (banyak)' },
+  ];
+  const ROLES = [{ v: 'admin', l: 'Admin' }, { v: 'recruiter', l: 'Recruiter' }, { v: 'viewer', l: 'Viewer' }];
+  const MASTER_LABELS = { department: 'Departemen', location: 'Lokasi', job_type: 'Tipe Pekerjaan', source: 'Sumber Kandidat' };
+
+  function call(action, data, token) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(r => {
+          if (r && r.ok) resolve(r.data);
+          else { const e = new Error((r && r.error) || 'Terjadi kesalahan'); e.auth = r && r.auth; reject(e); }
+        })
+        .withFailureHandler(err => reject(err instanceof Error ? err : new Error(String(err))))
+        .api({ action, data: data || {}, token: token || null });
+    });
+  }
+  function readFile(file) {
+    return new Promise((resolve, reject) => {
+      if (!file) return resolve(null);
+      if (file.size > 10 * 1024 * 1024) return reject(new Error('Ukuran file maksimal 10 MB.'));
+      const r = new FileReader();
+      r.onload = () => resolve({ name: file.name, mime: file.type, data: String(r.result).split(',')[1] });
+      r.onerror = () => reject(new Error('Gagal membaca file.'));
+      r.readAsDataURL(file);
+    });
+  }
+
+  createApp({
+    template: '#tpl',
+    data() {
+      return {
+        booting: true, busy: false, view: 'careers', toast: null, sideOpen: false,
+        pub: { settings: {}, jobs: [], fields: [], masters: [], appUrl: '' },
+        cf: { q: '', dept: '', loc: '', type: '' },
+        cj: null, applied: false, af: this.blankApply(),
+        lf: { email: '', password: '' },
+        token: LS.get('rec_token'), user: null,
+        db: { settings: {}, jobs: [], stages: [], fields: [], masters: [], templates: [], candidates: [], interviews: [], users: [] },
+        tab: LS.get('rec_tab') || 'dashboard', stab: 'general', mtab: 'department',
+        jf: { q: '', status: '' },
+        kf: { q: '', job: '', stage: '', mode: LS.get('rec_kmode') || 'kanban' },
+        if_: { status: '', when: 'upcoming' },
+        dragId: null, dragOver: null,
+        candId: null, activity: [], activityLoading: false, noteDraft: '', mailTpl: '', mail: { subject: '', body: '' },
+        modal: null, sf: {}, pf: { name: '' }, pw: { old: '', new: '', new2: '' },
+        jobStatuses: ['Open', 'Closed', 'Draft'],
+        interviewStatuses: ['Terjadwal', 'Selesai', 'Dibatalkan', 'Tidak Hadir'],
+        settingTabs: [
+          { id: 'general', label: 'Umum & Tampilan' }, { id: 'stages', label: 'Tahapan Seleksi' },
+          { id: 'fields', label: 'Form Lamaran' }, { id: 'master', label: 'Data Master' },
+          { id: 'templates', label: 'Template Email' }, { id: 'users', label: 'Pengguna' },
+        ],
+        settingFields: [
+          { k: 'company_name', l: 'Nama Perusahaan' },
+          { k: 'tagline', l: 'Tagline' },
+          { k: 'logo_url', l: 'URL Logo', ph: 'https://…/logo.png', h: 'Gunakan link gambar publik.' },
+          { k: 'primary_color', l: 'Warna Utama', t: 'color' },
+          { k: 'careers_title', l: 'Judul Halaman Karir' },
+          { k: 'apply_button_text', l: 'Teks Tombol Lamar' },
+          { k: 'careers_intro', l: 'Teks Pembuka Halaman Karir', t: 'textarea' },
+          { k: 'success_message', l: 'Pesan Setelah Melamar', t: 'textarea' },
+          { k: 'cv_label', l: 'Label Upload CV' },
+          { k: 'footer_text', l: 'Teks Footer' },
+          { k: 'email_from_name', l: 'Nama Pengirim Email' },
+          { k: 'admin_notify_email', l: 'Email Notifikasi Admin', ph: 'hr@perusahaan.com', h: 'Dikirimi email setiap ada lamaran baru (pisahkan dengan koma). Kosongkan untuk menonaktifkan.' },
+          { k: 'cv_required', l: 'CV wajib diunggah', t: 'checkbox' },
+          { k: 'show_salary', l: 'Tampilkan gaji di halaman karir', t: 'checkbox' },
+          { k: 'email_notifications', l: 'Aktifkan email otomatis ke kandidat', t: 'checkbox' },
+        ],
+      };
+    },
+    computed: {
+      S() { return this.view === 'admin' ? this.db.settings : this.pub.settings; },
+      isAdmin() { return this.user && this.user.role === 'admin'; },
+      canEdit() { return this.user && ['admin', 'recruiter'].includes(this.user.role); },
+      menu() {
+        const m = [
+          { id: 'dashboard', label: 'Dashboard', icon: '📊' }, { id: 'jobs', label: 'Lowongan', icon: '💼' },
+          { id: 'candidates', label: 'Kandidat', icon: '👥' }, { id: 'interviews', label: 'Interview', icon: '📅' },
+        ];
+        if (this.isAdmin) m.push({ id: 'settings', label: 'Pengaturan', icon: '⚙️' });
+        m.push({ id: 'account', label: 'Akun Saya', icon: '👤' });
+        return m;
+      },
+      pubJobs() {
+        const q = this.cf.q.toLowerCase();
+        return this.pub.jobs.filter(j =>
+          (!q || [j.title, j.department, j.location, j.description].join(' ').toLowerCase().includes(q)) &&
+          (!this.cf.dept || j.department === this.cf.dept) && (!this.cf.loc || j.location === this.cf.loc) &&
+          (!this.cf.type || j.type === this.cf.type)
+        ).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      },
+      filteredJobs() {
+        const q = this.jf.q.toLowerCase();
+        return this.db.jobs.filter(j => (!q || [j.title, j.department, j.location].join(' ').toLowerCase().includes(q)) && (!this.jf.status || j.status === this.jf.status))
+          .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      },
+      filteredCands() {
+        const q = this.kf.q.toLowerCase();
+        return this.db.candidates.filter(c =>
+          (!q || [c.name, c.email, c.phone].join(' ').toLowerCase().includes(q)) &&
+          (!this.kf.job || c.job_id === this.kf.job) && (!this.kf.stage || c.stage_id === this.kf.stage)
+        ).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      },
+      orphanCands() {
+        const ids = new Set(this.db.stages.map(s => s.id));
+        return this.filteredCands.filter(c => !ids.has(c.stage_id));
+      },
+      recentCandidates() { return [...this.db.candidates].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))).slice(0, 8); },
+      upcomingInterviews() {
+        const now = Date.now();
+        return this.db.interviews.filter(i => i.status === 'Terjadwal' && (parseD(i.datetime) || 0) >= now - 3600e3)
+          .sort((a, b) => String(a.datetime).localeCompare(String(b.datetime)));
+      },
+      filteredInterviews() {
+        const now = Date.now();
+        return this.db.interviews.filter(i => {
+          const t = (parseD(i.datetime) || new Date(0)).getTime();
+          if (this.if_.status && i.status !== this.if_.status) return false;
+          if (this.if_.when === 'upcoming' && t < now - 3600e3) return false;
+          if (this.if_.when === 'past' && t >= now - 3600e3) return false;
+          return true;
+        }).sort((a, b) => this.if_.when === 'past' ? String(b.datetime).localeCompare(String(a.datetime)) : String(a.datetime).localeCompare(String(b.datetime)));
+      },
+      cand() { return this.candId ? this.db.candidates.find(c => c.id === this.candId) : null; },
+      candInterviews() { return this.cand ? this.db.interviews.filter(i => i.candidate_id === this.cand.id).sort((a, b) => String(b.datetime).localeCompare(String(a.datetime))) : []; },
+      masterTypes() {
+        const t = new Set(Object.keys(MASTER_LABELS));
+        this.db.masters.forEach(m => m.type && t.add(m.type));
+        return [...t];
+      },
+      customSettingKeys() {
+        const known = new Set(this.settingFields.map(f => f.k));
+        return Object.keys(this.sf).filter(k => !known.has(k));
+      },
+      ENT() {
+        const vm = this;
+        const mv = t => () => vm.mastersOf(t).map(m => ({ v: m.value, l: m.value }));
+        return {
+          Jobs: { title: 'Lowongan', fields: [
+            { k: 'title', l: 'Nama Posisi', req: true, full: true },
+            { k: 'department', l: 'Departemen', t: 'combo', opt: mv('department') },
+            { k: 'location', l: 'Lokasi', t: 'combo', opt: mv('location') },
+            { k: 'type', l: 'Tipe Pekerjaan', t: 'combo', opt: mv('job_type') },
+            { k: 'status', l: 'Status', t: 'select', req: true, opt: () => vm.jobStatuses.map(s => ({ v: s, l: s })), h: 'Hanya status "Open" yang tampil di halaman karir.' },
+            { k: 'salary', l: 'Rentang Gaji', ph: 'Rp 5.000.000 - Rp 7.000.000' },
+            { k: 'quota', l: 'Kebutuhan (orang)', t: 'number' },
+            { k: 'deadline', l: 'Batas Lamaran', t: 'date', h: 'Kosongkan jika tidak ada batas.' },
+            { k: 'description', l: 'Deskripsi Pekerjaan', t: 'textarea', rows: 5 },
+            { k: 'requirements', l: 'Kualifikasi', t: 'textarea', rows: 5 },
+          ] },
+          Candidates: { title: 'Kandidat', fields: [
+            { k: 'name', l: 'Nama', req: true },
+            { k: 'email', l: 'Email', t: 'email', req: true },
+            { k: 'phone', l: 'No. HP' },
+            { k: 'job_id', l: 'Lowongan', t: 'select', req: true, opt: () => vm.db.jobs.map(j => ({ v: j.id, l: j.title })) },
+            { k: 'stage_id', l: 'Tahapan', t: 'select', opt: () => vm.db.stages.map(s => ({ v: s.id, l: s.name })) },
+            { k: 'source', l: 'Sumber', t: 'combo', opt: mv('source') },
+            { k: 'notes', l: 'Catatan', t: 'textarea' },
+          ] },
+          Interviews: { title: 'Jadwal Interview', fields: [
+            { k: 'candidate_id', l: 'Kandidat', t: 'select', req: true, full: true, opt: () => vm.db.candidates.map(c => ({ v: c.id, l: c.name + ' — ' + vm.jobName(c.job_id) })) },
+            { k: 'title', l: 'Judul', ph: 'Interview HR / User / Teknis' },
+            { k: 'datetime', l: 'Tanggal & Jam', t: 'datetime-local', req: true },
+            { k: 'duration', l: 'Durasi (menit)', t: 'number' },
+            { k: 'interviewer', l: 'Pewawancara', t: 'combo', opt: () => vm.db.users.map(u => ({ v: u.name, l: u.name })) },
+            { k: 'location', l: 'Lokasi / Link Meeting', full: true },
+            { k: 'status', l: 'Status', t: 'select', req: true, opt: () => vm.interviewStatuses.map(s => ({ v: s, l: s })) },
+            { k: 'score', l: 'Skor (1-100)', t: 'number' },
+            { k: 'feedback', l: 'Feedback / Hasil', t: 'textarea' },
+          ] },
+          Stages: { title: 'Tahapan', fields: [
+            { k: 'name', l: 'Nama Tahapan', req: true },
+            { k: 'color', l: 'Warna', t: 'color' },
+            { k: 'is_final', l: 'Jenis Tahap', t: 'select', opt: () => [{ v: 'hired', l: 'Tahap akhir — Diterima' }, { v: 'rejected', l: 'Tahap akhir — Ditolak' }], h: 'Kosongkan untuk tahap proses biasa.' },
+            { k: 'order', l: 'Urutan', t: 'number' },
+          ] },
+          FormFields: { title: 'Field Form', fields: [
+            { k: 'label', l: 'Label / Pertanyaan', req: true, full: true },
+            { k: 'key', l: 'Key (ID unik)', ph: 'otomatis dari label', h: 'Huruf kecil & underscore. Jangan diubah jika sudah ada jawaban.' },
+            { k: 'type', l: 'Tipe Input', t: 'select', req: true, opt: () => FIELD_TYPES },
+            { k: 'options', l: 'Pilihan (satu per baris)', t: 'textarea', show: r => ['select', 'radio', 'checkbox'].includes(r.type) },
+            { k: 'placeholder', l: 'Placeholder' },
+            { k: 'order', l: 'Urutan', t: 'number' },
+            { k: 'required', l: 'Wajib diisi', t: 'checkbox' },
+            { k: 'active', l: 'Aktif (tampil di form)', t: 'checkbox' },
+          ] },
+          Master: { title: 'Data Master', fields: [
+            { k: 'type', l: 'Jenis', t: 'combo', req: true, opt: () => vm.masterTypes.map(t => ({ v: t, l: vm.masterLabel(t) })), h: 'department, location, job_type, source, atau jenis baru.' },
+            { k: 'value', l: 'Nilai', req: true },
+            { k: 'order', l: 'Urutan', t: 'number' },
+          ] },
+          EmailTemplates: { title: 'Template Email', fields: [
+            { k: 'name', l: 'Nama Template', req: true },
+            { k: 'trigger', l: 'Dipicu saat', t: 'select', req: true, opt: () => vm.triggerOptions },
+            { k: 'subject', l: 'Subjek', req: true, full: true },
+            { k: 'body', l: 'Isi Email', t: 'textarea', req: true, rows: 9 },
+            { k: 'active', l: 'Aktif', t: 'checkbox' },
+          ] },
+          Users: { title: 'Pengguna', fields: [
+            { k: 'name', l: 'Nama', req: true },
+            { k: 'email', l: 'Email', t: 'email', req: true },
+            { k: 'role', l: 'Role', t: 'select', req: true, opt: () => ROLES },
+            { k: 'password', l: 'Password', t: 'password', req: true, ph: r => r.id ? 'Kosongkan jika tidak diubah' : 'Minimal 6 karakter' },
+            { k: 'active', l: 'Aktif', t: 'checkbox' },
+          ] },
+        };
+      },
+      triggerOptions() {
+        return [{ v: 'manual', l: 'Manual (dikirim sendiri)' }, { v: 'apply', l: 'Saat kandidat melamar' }]
+          .concat(this.db.stages.map(s => ({ v: 'stage:' + s.id, l: 'Saat pindah ke tahap: ' + s.name })));
+      },
+    },
+    watch: {
+      tab(v) { LS.set('rec_tab', v); if (v === 'settings') this.sf = Object.assign({}, this.db.settings); },
+      'kf.mode'(v) { LS.set('rec_kmode', v); },
+      S: { handler(s) { this.applyTheme(s); }, deep: true },
+      candId(id) {
+        this.mailTpl = ''; this.mail = { subject: '', body: '' };
+        this.noteDraft = this.cand ? (this.cand.notes || '') : '';
+        if (id) this.loadActivity(id);
+      },
+      'modal.rec.label'(v) {
+        if (this.modal && this.modal.table === 'FormFields' && !this.modal.rec.id && !this.modal.keyTouched) {
+          this.modal.rec.key = String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+        }
+      },
+    },
+    async mounted() {
+      const loc = await new Promise(res => {
+        try { google.script.url.getLocation(l => res(l)); } catch (e) { res({ parameter: {} }); }
+      });
+      const p = (loc && loc.parameter) || {};
+      try {
+        this.pub = await call('publicData');
+      } catch (e) { this.notify(e.message, 'error'); }
+      if (this.token) {
+        try { await this.loadAdmin(); }
+        catch (e) { this.token = null; this.user = null; LS.del('rec_token'); this.view = 'careers'; }
+      }
+      if (p.page === 'admin') this.view = this.user ? 'admin' : 'login';
+      if (p.job) { const j = this.pub.jobs.find(x => x.id === p.job); if (j) { this.view = 'careers'; this.openJob(j); } }
+      this.booting = false;
+    },
+    methods: {
+      isTrue,
+      blankApply() { return { name: '', email: '', phone: '', answers: {}, file: null, website: '' }; },
+      notify(msg, type) {
+        this.toast = { msg, type: type || '' };
+        clearTimeout(this._tt); this._tt = setTimeout(() => (this.toast = null), type === 'error' ? 5000 : 2800);
+      },
+      async api(action, data) {
+        try { return await call(action, data, this.token); }
+        catch (e) {
+          if (e.auth) { this.token = null; this.user = null; LS.del('rec_token'); this.view = 'login'; }
+          throw e;
+        }
+      },
+      async run(fn, okMsg) {
+        this.busy = true;
+        try { const r = await fn(); if (okMsg) this.notify(okMsg, 'success'); return r; }
+        catch (e) { this.notify(e.message, 'error'); }
+        finally { this.busy = false; }
+      },
+      applyTheme(s) {
+        const c = (s && s.primary_color) || '#4f46e5';
+        document.documentElement.style.setProperty('--p', c);
+        document.documentElement.style.setProperty('--p-soft', c + '14');
+      },
+      opts(s) { return String(s || '').split(/\n|,/).map(x => x.trim()).filter(Boolean); },
+      optList(f) { return f.opt ? f.opt() : []; },
+      pubMaster(t) { return this.pub.masters.filter(m => m.type === t).map(m => m.value); },
+      mastersOf(t) { return this.db.masters.filter(m => m.type === t).sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)); },
+      masterLabel(t) { return MASTER_LABELS[t] || t; },
+      roleLabel(r) { return (ROLES.find(x => x.v === r) || {}).l || r; },
+      fieldTypeLabel(t) { return (FIELD_TYPES.find(x => x.v === t) || {}).l || t; },
+      triggerLabel(t) { return (this.triggerOptions.find(x => x.v === t) || {}).l || t; },
+      statusCls(s) { return s === 'Open' ? 'b-open' : s === 'Closed' ? 'b-closed' : 'b-draft'; },
+      fmtDate(v) { const d = parseD(v); return d ? d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() : ''; },
+      fmtDateTime(v) { const d = parseD(v); return d ? this.fmtDate(v) + ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) : ''; },
+      waLink(p) { let n = String(p).replace(/\D/g, ''); if (n.startsWith('0')) n = '62' + n.slice(1); return 'https://wa.me/' + n; },
+      jobName(id) { return (this.db.jobs.find(j => j.id === id) || {}).title || '-'; },
+      stageName(id) { return (this.db.stages.find(s => s.id === id) || {}).name || '-'; },
+      stageColor(id) { return (this.db.stages.find(s => s.id === id) || {}).color || '#94a3b8'; },
+      candById(id) { return this.db.candidates.find(c => c.id === id); },
+      candName(id) { return (this.candById(id) || {}).name || '(dihapus)'; },
+      byStage(id) { return this.db.candidates.filter(c => c.stage_id === id); },
+      countFinal(kind) { const ids = this.db.stages.filter(s => s.is_final === kind).map(s => s.id); return this.db.candidates.filter(c => ids.includes(c.stage_id)).length; },
+      pct(n) { return this.db.candidates.length ? Math.round(n * 100 / this.db.candidates.length) : 0; },
+      answerList(c) {
+        let a = {}; try { a = JSON.parse(c.answers || '{}'); } catch (e) {}
+        const out = [];
+        const used = new Set();
+        this.db.fields.forEach(f => { if (a[f.key] !== undefined && a[f.key] !== '') { used.add(f.key); out.push({ k: f.key, l: f.label, v: Array.isArray(a[f.key]) ? a[f.key].join(', ') : a[f.key] }); } });
+        Object.keys(a).forEach(k => { if (!used.has(k) && a[k] !== '') out.push({ k, l: k, v: Array.isArray(a[k]) ? a[k].join(', ') : a[k] }); });
+        return out;
+      },
+
+      /* ---------- Careers ---------- */
+      goAdmin() { this.view = this.user ? 'admin' : 'login'; },
+      openJob(j) {
+        this.cj = j; this.applied = false; this.af = this.blankApply();
+        (this.pub.fields || []).forEach(f => { this.af.answers[f.key] = f.type === 'checkbox' ? [] : ''; });
+      },
+      async submitApply() {
+        await this.run(async () => {
+          const file = await readFile(this.af.file);
+          await call('apply', { job_id: this.cj.id, name: this.af.name, email: this.af.email, phone: this.af.phone, answers: this.af.answers, file, website: this.af.website });
+          this.applied = true;
+        });
+      },
+      copyJobLink(j) {
+        const base = this.db.appUrl || '';
+        const url = base + (base.includes('?') ? '&' : '?') + 'job=' + j.id;
+        const done = () => this.notify('Link lowongan disalin', 'success');
+        try { navigator.clipboard.writeText(url).then(done, () => prompt('Salin link:', url)); } catch (e) { prompt('Salin link:', url); }
+      },
+
+      /* ---------- Auth ---------- */
+      async login() {
+        await this.run(async () => {
+          const r = await call('login', this.lf);
+          this.token = r.token; LS.set('rec_token', r.token);
+          await this.loadAdmin();
+          this.view = 'admin'; this.lf.password = '';
+        });
+      },
+      async logout() {
+        try { await this.api('logout'); } catch (e) {}
+        this.token = null; this.user = null; LS.del('rec_token'); this.view = 'careers';
+      },
+      async loadAdmin() {
+        const d = await this.api('bootstrap');
+        this.user = d.user; this.pf.name = d.user.name;
+        Object.assign(this.db, d);
+        this.sf = Object.assign({}, d.settings);
+        if (!this.menu.find(m => m.id === this.tab)) this.tab = 'dashboard';
+      },
+      async reload() { await this.run(() => this.loadAdmin(), 'Data dimuat ulang'); },
+
+      /* ---------- CRUD generik ---------- */
+      tableKey(t) { return { Jobs: 'jobs', Candidates: 'candidates', Interviews: 'interviews', Stages: 'stages', FormFields: 'fields', Master: 'masters', EmailTemplates: 'templates', Users: 'users' }[t]; },
+      edit(table, rec) {
+        const r = Object.assign({}, rec || {});
+        if (table === 'Users') r.password = '';
+        if (table === 'Jobs' && !r.status) r.status = 'Open';
+        if (table === 'Interviews') {
+          if (!r.status) r.status = 'Terjadwal';
+          if (r.datetime) r.datetime = String(r.datetime).slice(0, 16);
+          if (!r.interviewer && !r.id) r.interviewer = this.user.name;
+          if (!r.duration && !r.id) r.duration = '60';
+        }
+        if (table === 'Master' && !r.order) r.order = String(this.mastersOf(r.type).length + 1);
+        this.modal = { table, rec: r, file: null, keyTouched: !!r.id };
+      },
+      async saveModal() {
+        const { table, rec, file } = this.modal;
+        await this.run(async () => {
+          let saved = await this.api('save', { table, record: rec });
+          if (table === 'Candidates' && file) {
+            const f = await readFile(file);
+            saved = await this.api('uploadCV', { candidate_id: saved.id, file: f });
+          }
+          this.upsertLocal(table, saved);
+          if (table === 'Stages' || table === 'FormFields' || table === 'Master') this.sortLocal(table);
+          this.modal = null;
+          if (this.candId && (table === 'Interviews' || table === 'Candidates')) this.loadActivity(this.candId);
+        }, 'Tersimpan');
+      },
+      upsertLocal(table, rec) {
+        const arr = this.db[this.tableKey(table)];
+        const i = arr.findIndex(x => x.id === rec.id);
+        if (i >= 0) arr.splice(i, 1, rec); else arr.push(rec);
+      },
+      sortLocal(table) { this.db[this.tableKey(table)].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0)); },
+      async del(table, rec) {
+        const label = rec.name || rec.title || rec.label || rec.value || 'data ini';
+        if (!confirm('Hapus "' + label + '"? Tindakan ini tidak bisa dibatalkan.')) return;
+        await this.run(async () => {
+          await this.api('remove', { table, id: rec.id });
+          const arr = this.db[this.tableKey(table)];
+          const i = arr.findIndex(x => x.id === rec.id); if (i >= 0) arr.splice(i, 1);
+          if (table === 'Candidates') { this.candId = null; this.db.interviews = this.db.interviews.filter(x => x.candidate_id !== rec.id); }
+        }, 'Terhapus');
+      },
+      async move(table, list, i, dir) {
+        const j = i + dir;
+        if (j < 0 || j >= list.length) return;
+        const ids = list.map(x => x.id);
+        [ids[i], ids[j]] = [ids[j], ids[i]];
+        ids.forEach((id, n) => { const r = this.db[this.tableKey(table)].find(x => x.id === id); if (r) r.order = String(n + 1); });
+        this.sortLocal(table);
+        await this.run(() => this.api('reorder', { table, ids }));
+      },
+
+      /* ---------- Kandidat ---------- */
+      openCand(id) { this.candId = id; },
+      async loadActivity(id) {
+        this.activityLoading = true;
+        try { this.activity = await this.api('activity', { candidate_id: id }); } catch (e) { this.activity = []; }
+        this.activityLoading = false;
+      },
+      async saveCand(c, patch, msg) {
+        const before = Object.assign({}, c);
+        Object.assign(c, patch);
+        try {
+          const saved = await this.api('save', { table: 'Candidates', record: Object.assign({ id: c.id }, patch) });
+          this.upsertLocal('Candidates', saved);
+          if (msg) this.notify(msg, 'success');
+          if (this.candId === c.id) this.loadActivity(c.id);
+        } catch (e) { Object.assign(c, before); this.notify(e.message, 'error'); }
+      },
+      moveCand(c, stageId) { if (stageId !== c.stage_id) this.saveCand(c, { stage_id: stageId }, 'Dipindah ke ' + this.stageName(stageId)); },
+      dropTo(stageId) {
+        this.dragOver = null;
+        const c = this.candById(this.dragId); this.dragId = null;
+        if (c && this.canEdit) this.moveCand(c, stageId);
+      },
+      setRating(c, n) { this.saveCand(c, { rating: String(Number(c.rating) === n ? 0 : n) }); },
+      saveNote(c) { this.saveCand(c, { notes: this.noteDraft }, 'Catatan disimpan'); },
+      async uploadCV(c, ev) {
+        const file = ev.target.files[0]; ev.target.value = '';
+        if (!file) return;
+        await this.run(async () => {
+          const f = await readFile(file);
+          const saved = await this.api('uploadCV', { candidate_id: c.id, file: f });
+          this.upsertLocal('Candidates', saved); this.loadActivity(c.id);
+        }, 'CV diunggah');
+      },
+      applyTpl() {
+        const t = this.db.templates.find(x => x.id === this.mailTpl);
+        if (t) this.mail = { subject: t.subject, body: t.body };
+      },
+      async sendMail(c) {
+        await this.run(async () => {
+          await this.api('sendEmail', { candidate_id: c.id, subject: this.mail.subject, body: this.mail.body });
+          this.mail = { subject: '', body: '' }; this.mailTpl = ''; this.loadActivity(c.id);
+        }, 'Email terkirim');
+      },
+      exportCSV() {
+        const fields = this.db.fields;
+        const head = ['Nama', 'Email', 'No HP', 'Lowongan', 'Tahapan', 'Rating', 'Sumber', 'Tanggal Melamar', 'CV', 'Catatan'].concat(fields.map(f => f.label));
+        const rows = this.filteredCands.map(c => {
+          let a = {}; try { a = JSON.parse(c.answers || '{}'); } catch (e) {}
+          return [c.name, c.email, c.phone, this.jobName(c.job_id), this.stageName(c.stage_id), c.rating, c.source, this.fmtDate(c.created_at), c.cv_url, c.notes]
+            .concat(fields.map(f => Array.isArray(a[f.key]) ? a[f.key].join('; ') : (a[f.key] || '')));
+        });
+        const csv = [head].concat(rows).map(r => r.map(v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+        const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = 'kandidat.csv';
+        document.body.appendChild(a); a.click(); a.remove();
+      },
+
+      /* ---------- Pengaturan & akun ---------- */
+      async saveSettings() {
+        await this.run(async () => {
+          const s = await this.api('saveSettings', { settings: this.sf });
+          this.db.settings = s; this.sf = Object.assign({}, s);
+          this.pub.settings = Object.assign({}, this.pub.settings, s);
+        }, 'Pengaturan disimpan');
+      },
+      async saveProfile() {
+        await this.run(async () => { const u = await this.api('updateProfile', { name: this.pf.name }); this.user = Object.assign({}, this.user, u); this.upsertLocal('Users', u); }, 'Profil disimpan');
+      },
+      async changePassword() {
+        if (this.pw.new !== this.pw.new2) return this.notify('Konfirmasi password tidak sama.', 'error');
+        await this.run(async () => { await this.api('changePassword', { old: this.pw.old, new: this.pw.new }); this.pw = { old: '', new: '', new2: '' }; }, 'Password diganti');
+      },
+    },
+  }).mount('#app');
+})();
+</script>

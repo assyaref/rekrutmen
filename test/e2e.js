@@ -1,0 +1,128 @@
+const { chromium } = require('playwright');
+const fs = require('fs');
+const OUT = process.argv[2] || '.';
+(async () => {
+  const b = await chromium.launch();
+  const p = await b.newPage({ viewport: { width: 1366, height: 860 } });
+  p.setDefaultTimeout(6000);
+  const errs = [];
+  p.on('pageerror', e => errs.push('pageerror: ' + e.message));
+  p.on('console', m => { if (m.type() === 'error') errs.push('console: ' + m.text()); });
+  p.on('dialog', d => d.accept());
+  const step = async (name, fn) => { try { await fn(); console.log('✔', name); } catch (e) { console.log('✘', name, e.message.split('\n')[0]); errs.push(name); } };
+
+  await p.goto('http://localhost:8080/');
+  await step('careers renders', () => p.waitForSelector('.job:has-text("Staff Administrasi")', { timeout: 8000 }));
+  await p.screenshot({ path: OUT + '/1-careers.png' });
+  await step('open job & apply', async () => {
+    await p.click('.job');
+    await p.fill('.modal form input >> nth=1', 'Budi Santoso');
+    const inputs = p.locator('.modal form input:visible, .modal form select:visible, .modal form textarea:visible');
+    await p.locator('.modal input[type=email]').fill('budi@mail.com');
+    await p.locator('.modal input[type=tel]').fill('081234567890');
+    await p.locator('.modal input[type=date]').fill('1995-02-03');
+    await p.locator('.modal .field:has-text("Domisili") input').fill('Jakarta');
+    await p.locator('.modal select').selectOption('S1');
+    await p.locator('.modal input[type=number]').fill('3');
+    fs.writeFileSync('/tmp/claude-cv.pdf', '%PDF-1.4 test');
+    await p.locator('.modal input[type=file]').setInputFiles('/tmp/claude-cv.pdf');
+    await p.screenshot({ path: OUT + '/2-apply.png' });
+    await p.click('button:has-text("Kirim Lamaran"), a:has-text("Kirim Lamaran")');
+    await p.waitForSelector('.success-box', { timeout: 5000 });
+  });
+  await step('duplicate rejected', async () => {
+    await p.click('.modal .btn:has-text("Tutup")');
+    await p.click('.job');
+    await p.locator('.modal form input >> nth=1').fill('Budi');
+    await p.locator('.modal input[type=email]').fill('budi@mail.com');
+    await p.locator('.modal .field:has-text("Domisili") input').fill('X');
+    await p.locator('.modal select').selectOption('S1');
+    await p.locator('.modal input[type=number]').fill('3');
+    await p.locator('.modal input[type=file]').setInputFiles('/tmp/claude-cv.pdf');
+    await p.click('button:has-text("Kirim Lamaran"), a:has-text("Kirim Lamaran")');
+    await p.waitForSelector('.toast.error:has-text("sudah melamar")', { timeout: 5000 });
+    await p.click('.modal .x');
+  });
+  await step('login', async () => {
+    await p.click('button:has-text("Masuk Admin"), a:has-text("Masuk Admin")');
+    await p.fill('input[type=email]', 'admin@admin.com');
+    await p.fill('input[type=password]', 'admin123');
+    await p.click('button:has-text("Masuk")');
+    await p.waitForSelector('.stat:has-text("Total kandidat")', { timeout: 5000 });
+  });
+  await p.screenshot({ path: OUT + '/3-dashboard.png' });
+  await step('kanban drag to Interview', async () => {
+    await p.click('.nav a:has-text("Kandidat")');
+    await p.waitForSelector('.kcard');
+    await p.dragAndDrop('.kcard', '.col:has-text("Interview")');
+    await p.waitForSelector('.col:has-text("Interview") .kcard', { timeout: 5000 });
+    await p.waitForTimeout(500);
+  });
+  await p.screenshot({ path: OUT + '/4-kanban.png' });
+  await step('candidate drawer + rating + note + interview', async () => {
+    await p.click('.kcard');
+    await p.waitForSelector('.drawer >> text=Jawaban Form');
+    await p.click('.drawer .star >> nth=3');
+    await p.fill('.drawer textarea >> nth=0', 'Kandidat bagus');
+    await p.click('button:has-text("Simpan catatan"), a:has-text("Simpan catatan")');
+    await p.click('button:has-text("+ Jadwalkan"), a:has-text("+ Jadwalkan")');
+    await p.fill('.modal input[type=datetime-local]', '2026-12-01T10:00');
+    await p.click('.modal button:has-text("Simpan")');
+    await p.waitForSelector('.drawer >> text=Interview dijadwalkan', { timeout: 5000 });
+    await p.waitForSelector('.drawer >> text=Email otomatis', { timeout: 5000 });
+  });
+  await p.screenshot({ path: OUT + '/5-drawer.png' });
+  await p.click('.drawer .x');
+  await step('create job', async () => {
+    await p.click('.nav a:has-text("Lowongan")');
+    await p.click('button:has-text("+ Lowongan"), a:has-text("+ Lowongan")');
+    await p.fill('.modal .field:has-text("Nama Posisi") input', 'Frontend Developer');
+    await p.fill('.modal .field:has-text("Departemen") input', 'IT');
+    await p.click('.modal button:has-text("Simpan")');
+    await p.waitForSelector('td:has-text("Frontend Developer")');
+  });
+  await step('settings: color + stage + field', async () => {
+    await p.click('.nav a:has-text("Pengaturan")');
+    await p.fill('.field:has-text("Nama Perusahaan") input', 'PT Maju Jaya');
+    await p.locator('.field:has-text("Warna Utama") input:not([type=color])').fill('#0d9488');
+    await p.click('button:has-text("Simpan Pengaturan"), a:has-text("Simpan Pengaturan")');
+    await p.waitForSelector('.side-brand:has-text("PT Maju Jaya")');
+    await p.click('.tabs a:has-text("Tahapan")');
+    await p.click('button:has-text("+ Tahapan"), a:has-text("+ Tahapan")');
+    await p.fill('.modal .field:has-text("Nama Tahapan") input', 'Psikotes');
+    await p.click('.modal button:has-text("Simpan")');
+    await p.waitForSelector('.list-item:has-text("Psikotes")');
+    await p.click('.list-item:has-text("Psikotes") .handle button >> nth=0');
+    await p.click('.tabs a:has-text("Form Lamaran")');
+    await p.click('button:has-text("+ Field"), a:has-text("+ Field")');
+    await p.fill('.modal .field:has-text("Label") input', 'Bersedia ditempatkan di luar kota?');
+    await p.selectOption('.modal .field:has-text("Tipe Input") select', 'radio');
+    await p.fill('.modal .field:has-text("Pilihan") textarea', 'Ya\nTidak');
+    await p.click('.modal button:has-text("Simpan")');
+    await p.waitForSelector('.list-item:has-text("bersedia_ditempatkan")');
+  });
+  await p.screenshot({ path: OUT + '/6-settings.png' });
+  await step('users tab + add user', async () => {
+    await p.click('.tabs a:has-text("Pengguna")');
+    await p.click('button:has-text("+ Pengguna"), a:has-text("+ Pengguna")');
+    await p.fill('.modal .field:has-text("Nama") input', 'Rina HR');
+    await p.fill('.modal input[type=email]', 'rina@hr.com');
+    await p.fill('.modal input[type=password]', 'rahasia1');
+    await p.click('.modal button:has-text("Simpan")');
+    await p.waitForSelector('td:has-text("rina@hr.com")');
+  });
+  await step('careers reflects new field & branding', async () => {
+    await p.goto('http://localhost:8080/?page=careers');
+    await p.waitForSelector('.c-brand:has-text("PT Maju Jaya")');
+    await p.click('.job:has-text("Frontend Developer")');
+    await p.waitForSelector('.modal label:has-text("Bersedia ditempatkan")');
+  });
+  await p.screenshot({ path: OUT + '/7-careers-updated.png' });
+  const m = await p.setViewportSize({ width: 390, height: 844 });
+  await p.goto('http://localhost:8080/?page=admin');
+  await p.waitForTimeout(800);
+  await p.screenshot({ path: OUT + '/8-mobile.png' });
+  console.log('mails:', (await (await fetch('http://localhost:8080/_mails')).json()).map(x => x.subject));
+  console.log('ERRORS:', errs);
+  await b.close();
+})();

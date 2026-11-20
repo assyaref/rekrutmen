@@ -1,0 +1,549 @@
+<script type="text/x-template" id="tpl">
+<div>
+  <!-- ================= LOADING ================= -->
+  <div v-if="booting" class="boot"><div class="spinner"></div><p>Memuat…</p></div>
+
+  <!-- ================= CAREERS (PUBLIK) ================= -->
+  <div v-else-if="view==='careers'">
+    <div class="c-hero">
+      <div class="c-nav">
+        <img v-if="S.logo_url" :src="S.logo_url" class="c-logo" alt="">
+        <div class="c-brand">{{ S.company_name }}</div>
+        <div class="spacer"></div>
+        <button class="btn sm" @click="goAdmin">Masuk Admin</button>
+      </div>
+      <div class="c-hero-in">
+        <h1>{{ S.careers_title || 'Lowongan Pekerjaan' }}</h1>
+        <p>{{ S.careers_intro }}</p>
+      </div>
+    </div>
+    <div class="c-wrap">
+      <div class="card c-filter" style="margin-bottom:16px">
+        <input v-model="cf.q" placeholder="Cari posisi…">
+        <select v-model="cf.dept"><option value="">Semua departemen</option><option v-for="v in pubMaster('department')" :key="v">{{ v }}</option></select>
+        <select v-model="cf.loc"><option value="">Semua lokasi</option><option v-for="v in pubMaster('location')" :key="v">{{ v }}</option></select>
+        <select v-model="cf.type"><option value="">Semua tipe</option><option v-for="v in pubMaster('job_type')" :key="v">{{ v }}</option></select>
+      </div>
+      <div class="card" style="padding:0">
+        <div v-if="!pubJobs.length" class="empty">Belum ada lowongan yang sesuai.</div>
+        <div v-for="j in pubJobs" :key="j.id" class="job" @click="openJob(j)">
+          <div style="flex:1;min-width:0">
+            <h3>{{ j.title }}</h3>
+            <div class="meta">
+              <span v-if="j.department">🏢 {{ j.department }}</span>
+              <span v-if="j.location">📍 {{ j.location }}</span>
+              <span v-if="j.type">🕒 {{ j.type }}</span>
+              <span v-if="j.salary && isTrue(S.show_salary)">💰 {{ j.salary }}</span>
+              <span v-if="j.deadline">⏳ s/d {{ fmtDate(j.deadline) }}</span>
+            </div>
+          </div>
+          <button class="btn primary">{{ S.apply_button_text || 'Lamar' }}</button>
+        </div>
+      </div>
+    </div>
+    <div class="c-foot">{{ S.footer_text }}</div>
+
+    <!-- Detail + form lamaran -->
+    <div v-if="cj" class="overlay" @click.self="cj=null">
+      <div class="modal wide">
+        <div class="modal-h"><h3>{{ cj.title }}</h3><button class="x" @click="cj=null">×</button></div>
+        <div class="modal-b">
+          <div v-if="applied" class="success-box">
+            <div class="ic">✓</div>
+            <h3>Lamaran terkirim</h3>
+            <p class="muted pre">{{ S.success_message }}</p>
+            <button class="btn" @click="cj=null">Tutup</button>
+          </div>
+          <template v-else>
+            <div class="meta" style="margin-bottom:14px">
+              <span v-if="cj.department">🏢 {{ cj.department }}</span>
+              <span v-if="cj.location">📍 {{ cj.location }}</span>
+              <span v-if="cj.type">🕒 {{ cj.type }}</span>
+              <span v-if="cj.salary && isTrue(S.show_salary)">💰 {{ cj.salary }}</span>
+              <span v-if="cj.deadline">⏳ s/d {{ fmtDate(cj.deadline) }}</span>
+            </div>
+            <div v-if="cj.description" class="section"><h4>Deskripsi Pekerjaan</h4><div class="pre">{{ cj.description }}</div></div>
+            <div v-if="cj.requirements" class="section"><h4>Kualifikasi</h4><div class="pre">{{ cj.requirements }}</div></div>
+            <hr style="border:none;border-top:1px solid var(--line);margin:20px 0">
+            <h3>Form Lamaran</h3>
+            <form @submit.prevent="submitApply">
+              <input v-model="af.website" style="display:none" tabindex="-1" autocomplete="off">
+              <div class="grid g2" style="gap:0 16px">
+                <div class="field"><label class="lbl">Nama Lengkap <span class="req">*</span></label><input v-model="af.name" required></div>
+                <div class="field"><label class="lbl">Email <span class="req">*</span></label><input v-model="af.email" type="email" required></div>
+                <div class="field"><label class="lbl">No. HP / WhatsApp</label><input v-model="af.phone" type="tel"></div>
+                <div v-for="f in pub.fields" :key="f.id" class="field" :style="['textarea','checkbox','radio'].includes(f.type)?'grid-column:1/-1':''">
+                  <label class="lbl">{{ f.label }} <span v-if="isTrue(f.required)" class="req">*</span></label>
+                  <textarea v-if="f.type==='textarea'" v-model="af.answers[f.key]" :placeholder="f.placeholder" :required="isTrue(f.required)"></textarea>
+                  <select v-else-if="f.type==='select'" v-model="af.answers[f.key]" :required="isTrue(f.required)">
+                    <option value="">— pilih —</option><option v-for="o in opts(f.options)" :key="o">{{ o }}</option>
+                  </select>
+                  <div v-else-if="f.type==='radio'" class="opts">
+                    <label v-for="o in opts(f.options)" :key="o" class="check"><input type="radio" :name="f.key" :value="o" v-model="af.answers[f.key]" :required="isTrue(f.required)"> {{ o }}</label>
+                  </div>
+                  <div v-else-if="f.type==='checkbox'" class="opts">
+                    <label v-for="o in opts(f.options)" :key="o" class="check"><input type="checkbox" :value="o" v-model="af.answers[f.key]"> {{ o }}</label>
+                  </div>
+                  <input v-else v-model="af.answers[f.key]" :type="f.type||'text'" :placeholder="f.placeholder" :required="isTrue(f.required)">
+                </div>
+              </div>
+              <div class="field">
+                <label class="lbl">{{ S.cv_label || 'Upload CV' }} <span v-if="isTrue(S.cv_required)" class="req">*</span></label>
+                <input type="file" accept=".pdf,.doc,.docx,.odt,.rtf,.txt,.jpg,.jpeg,.png" @change="af.file=$event.target.files[0]" :required="isTrue(S.cv_required)">
+              </div>
+              <div class="row"><div class="spacer"></div>
+                <button class="btn primary lg" :disabled="busy">{{ busy ? 'Mengirim…' : 'Kirim Lamaran' }}</button>
+              </div>
+            </form>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= LOGIN ================= -->
+  <div v-else-if="view==='login'" class="login">
+    <div class="card">
+      <div style="text-align:center;margin-bottom:20px">
+        <img v-if="S.logo_url" :src="S.logo_url" style="height:48px;margin-bottom:10px" alt="">
+        <h2>{{ S.company_name }}</h2>
+        <div class="muted">Masuk ke panel rekrutmen</div>
+      </div>
+      <form @submit.prevent="login">
+        <div class="field"><label class="lbl">Email</label><input v-model="lf.email" type="email" required autofocus></div>
+        <div class="field"><label class="lbl">Password</label><input v-model="lf.password" type="password" required></div>
+        <button class="btn primary lg" style="width:100%;justify-content:center" :disabled="busy">{{ busy ? 'Memproses…' : 'Masuk' }}</button>
+      </form>
+      <div style="text-align:center;margin-top:16px"><a href="#" @click.prevent="view='careers'">← Kembali ke halaman karir</a></div>
+    </div>
+  </div>
+
+  <!-- ================= ADMIN ================= -->
+  <div v-else-if="view==='admin'" class="layout">
+    <div class="mobile-top">
+      <button class="btn sm" @click="sideOpen=!sideOpen">☰</button>
+      <b>{{ S.company_name }}</b>
+    </div>
+    <aside class="side" :class="{open:sideOpen}">
+      <div class="side-brand"><img v-if="S.logo_url" :src="S.logo_url" alt=""><span>{{ S.company_name || 'Rekrutmen' }}</span></div>
+      <nav class="nav">
+        <a v-for="m in menu" :key="m.id" :class="{on:tab===m.id}" @click="tab=m.id;sideOpen=false"><span class="ico">{{ m.icon }}</span>{{ m.label }}</a>
+        <a @click="view='careers'"><span class="ico">🌐</span>Halaman Karir</a>
+      </nav>
+      <div class="side-foot">
+        <div style="color:#fff;font-weight:600">{{ user.name }}</div>
+        <div class="small">{{ roleLabel(user.role) }}</div>
+        <a href="#" style="color:#93c5fd" @click.prevent="logout">Keluar</a>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- ===== DASHBOARD ===== -->
+      <template v-if="tab==='dashboard'">
+        <div class="page-h"><h2>Dashboard</h2><div class="spacer"></div><button class="btn" @click="reload">⟳ Muat ulang</button></div>
+        <div class="grid g4" style="margin-bottom:16px">
+          <div class="card stat"><div class="n">{{ db.candidates.length }}</div><div class="l">Total kandidat</div></div>
+          <div class="card stat"><div class="n">{{ db.jobs.filter(j=>j.status==='Open').length }}</div><div class="l">Lowongan aktif</div></div>
+          <div class="card stat"><div class="n">{{ upcomingInterviews.length }}</div><div class="l">Interview mendatang</div></div>
+          <div class="card stat"><div class="n">{{ countFinal('hired') }}</div><div class="l">Diterima</div></div>
+        </div>
+        <div class="grid g2">
+          <div class="card">
+            <h3>Kandidat per Tahapan</h3>
+            <div v-for="s in db.stages" :key="s.id" style="margin-bottom:12px">
+              <div class="row" style="margin-bottom:4px"><span class="dot" :style="{background:s.color}"></span>{{ s.name }}<div class="spacer"></div><b>{{ byStage(s.id).length }}</b></div>
+              <div class="bar"><i :style="{width:pct(byStage(s.id).length)+'%',background:s.color}"></i></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Kandidat per Lowongan</h3>
+            <div v-if="!db.jobs.length" class="muted">Belum ada lowongan.</div>
+            <div v-for="j in db.jobs" :key="j.id" style="margin-bottom:12px">
+              <div class="row" style="margin-bottom:4px">{{ j.title }} <span class="badge" :class="statusCls(j.status)">{{ j.status }}</span><div class="spacer"></div><b>{{ db.candidates.filter(c=>c.job_id===j.id).length }}</b></div>
+              <div class="bar"><i :style="{width:pct(db.candidates.filter(c=>c.job_id===j.id).length)+'%',background:'var(--p)'}"></i></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Pelamar Terbaru</h3>
+            <div v-if="!db.candidates.length" class="muted">Belum ada pelamar.</div>
+            <table class="tbl" v-else>
+              <tr v-for="c in recentCandidates" :key="c.id" class="click" @click="openCand(c.id)">
+                <td><b>{{ c.name }}</b><div class="small muted">{{ jobName(c.job_id) }}</div></td>
+                <td class="right"><span class="badge"><span class="dot" :style="{background:stageColor(c.stage_id)}"></span>{{ stageName(c.stage_id) }}</span><div class="small muted">{{ fmtDate(c.created_at) }}</div></td>
+              </tr>
+            </table>
+          </div>
+          <div class="card">
+            <h3>Interview Mendatang</h3>
+            <div v-if="!upcomingInterviews.length" class="muted">Tidak ada jadwal.</div>
+            <table class="tbl" v-else>
+              <tr v-for="i in upcomingInterviews.slice(0,8)" :key="i.id" class="click" @click="openCand(i.candidate_id)">
+                <td><b>{{ candName(i.candidate_id) }}</b><div class="small muted">{{ i.title }} · {{ i.interviewer }}</div></td>
+                <td class="right nowrap">{{ fmtDateTime(i.datetime) }}</td>
+              </tr>
+            </table>
+          </div>
+        </div>
+      </template>
+
+      <!-- ===== LOWONGAN ===== -->
+      <template v-if="tab==='jobs'">
+        <div class="page-h"><h2>Lowongan</h2><div class="spacer"></div><button v-if="canEdit" class="btn primary" @click="edit('Jobs')">+ Lowongan</button></div>
+        <div class="toolbar">
+          <input class="grow" v-model="jf.q" placeholder="Cari lowongan…">
+          <select v-model="jf.status"><option value="">Semua status</option><option v-for="s in jobStatuses" :key="s">{{ s }}</option></select>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Posisi</th><th>Departemen</th><th>Lokasi</th><th>Tipe</th><th>Batas</th><th>Pelamar</th><th>Status</th><th></th></tr></thead>
+            <tbody>
+              <tr v-if="!filteredJobs.length"><td colspan="8" class="empty">Tidak ada data.</td></tr>
+              <tr v-for="j in filteredJobs" :key="j.id">
+                <td><b>{{ j.title }}</b><div class="small muted">{{ j.salary }}</div></td>
+                <td>{{ j.department }}</td><td>{{ j.location }}</td><td>{{ j.type }}</td>
+                <td class="nowrap">{{ fmtDate(j.deadline) || '-' }}</td>
+                <td><a href="#" @click.prevent="tab='candidates';kf.job=j.id">{{ db.candidates.filter(c=>c.job_id===j.id).length }} kandidat</a></td>
+                <td><span class="badge" :class="statusCls(j.status)">{{ j.status }}</span></td>
+                <td class="right nowrap">
+                  <button class="btn sm ghost" title="Salin link" @click="copyJobLink(j)">🔗</button>
+                  <template v-if="canEdit">
+                    <button class="btn sm" @click="edit('Jobs',j)">Edit</button>
+                    <button class="btn sm danger" @click="del('Jobs',j)">Hapus</button>
+                  </template>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+
+      <!-- ===== KANDIDAT ===== -->
+      <template v-if="tab==='candidates'">
+        <div class="page-h"><h2>Kandidat</h2><div class="spacer"></div>
+          <div class="seg"><button :class="{on:kf.mode==='kanban'}" @click="kf.mode='kanban'">Kanban</button><button :class="{on:kf.mode==='table'}" @click="kf.mode='table'">Tabel</button></div>
+          <button class="btn" @click="exportCSV">⬇ Export CSV</button>
+          <button v-if="canEdit" class="btn primary" @click="edit('Candidates',{job_id:kf.job})">+ Kandidat</button>
+        </div>
+        <div class="toolbar">
+          <input class="grow" v-model="kf.q" placeholder="Cari nama, email, HP…">
+          <select v-model="kf.job"><option value="">Semua lowongan</option><option v-for="j in db.jobs" :key="j.id" :value="j.id">{{ j.title }}</option></select>
+          <select v-if="kf.mode==='table'" v-model="kf.stage"><option value="">Semua tahapan</option><option v-for="s in db.stages" :key="s.id" :value="s.id">{{ s.name }}</option></select>
+        </div>
+        <div v-if="kf.mode==='kanban'" class="kanban">
+          <div v-for="s in db.stages" :key="s.id" class="col" :class="{over:dragOver===s.id}"
+               @dragover.prevent="dragOver=s.id" @dragleave="dragOver=null" @drop.prevent="dropTo(s.id)">
+            <div class="col-h"><span class="dot" :style="{background:s.color}"></span>{{ s.name }}<div class="spacer"></div><span class="badge">{{ filteredCands.filter(c=>c.stage_id===s.id).length }}</span></div>
+            <div class="col-b">
+              <div v-for="c in filteredCands.filter(c=>c.stage_id===s.id)" :key="c.id" class="kcard" :draggable="canEdit"
+                   @dragstart="dragId=c.id" @click="openCand(c.id)">
+                <div class="nm">{{ c.name }}</div>
+                <div class="small muted">{{ jobName(c.job_id) }}</div>
+                <div class="row small muted" style="margin-top:6px;gap:6px"><span v-if="Number(c.rating)" style="color:#f59e0b">{{ '★'.repeat(Number(c.rating)) }}</span><div class="spacer"></div>{{ fmtDate(c.created_at) }}</div>
+              </div>
+            </div>
+          </div>
+          <div v-if="orphanCands.length" class="col">
+            <div class="col-h"><span class="dot" style="background:#94a3b8"></span>Tanpa tahapan<div class="spacer"></div><span class="badge">{{ orphanCands.length }}</span></div>
+            <div class="col-b"><div v-for="c in orphanCands" :key="c.id" class="kcard" :draggable="canEdit" @dragstart="dragId=c.id" @click="openCand(c.id)"><div class="nm">{{ c.name }}</div></div></div>
+          </div>
+        </div>
+        <div v-else class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Nama</th><th>Kontak</th><th>Lowongan</th><th>Tahapan</th><th>Rating</th><th>Sumber</th><th>Tanggal</th></tr></thead>
+            <tbody>
+              <tr v-if="!filteredCands.length"><td colspan="7" class="empty">Tidak ada kandidat.</td></tr>
+              <tr v-for="c in filteredCands" :key="c.id" class="click" @click="openCand(c.id)">
+                <td><b>{{ c.name }}</b></td>
+                <td>{{ c.email }}<div class="small muted">{{ c.phone }}</div></td>
+                <td>{{ jobName(c.job_id) }}</td>
+                <td><span class="badge"><span class="dot" :style="{background:stageColor(c.stage_id)}"></span>{{ stageName(c.stage_id) }}</span></td>
+                <td style="color:#f59e0b">{{ '★'.repeat(Number(c.rating)||0) }}</td>
+                <td>{{ c.source }}</td>
+                <td class="nowrap">{{ fmtDate(c.created_at) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+
+      <!-- ===== INTERVIEW ===== -->
+      <template v-if="tab==='interviews'">
+        <div class="page-h"><h2>Jadwal Interview</h2><div class="spacer"></div><button v-if="canEdit" class="btn primary" @click="edit('Interviews')">+ Jadwal</button></div>
+        <div class="toolbar">
+          <select v-model="if_.status"><option value="">Semua status</option><option v-for="s in interviewStatuses" :key="s">{{ s }}</option></select>
+          <select v-model="if_.when"><option value="upcoming">Mendatang</option><option value="past">Sudah lewat</option><option value="">Semua</option></select>
+        </div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>Waktu</th><th>Kandidat</th><th>Judul</th><th>Pewawancara</th><th>Lokasi / Link</th><th>Status</th><th>Skor</th><th></th></tr></thead>
+            <tbody>
+              <tr v-if="!filteredInterviews.length"><td colspan="8" class="empty">Tidak ada jadwal.</td></tr>
+              <tr v-for="i in filteredInterviews" :key="i.id">
+                <td class="nowrap">{{ fmtDateTime(i.datetime) }}<div class="small muted" v-if="i.duration">{{ i.duration }} menit</div></td>
+                <td><a href="#" @click.prevent="openCand(i.candidate_id)">{{ candName(i.candidate_id) }}</a><div class="small muted">{{ jobName((candById(i.candidate_id)||{}).job_id) }}</div></td>
+                <td>{{ i.title }}</td><td>{{ i.interviewer }}</td>
+                <td><a v-if="/^https?:/.test(i.location)" :href="i.location" target="_blank">Buka link</a><span v-else>{{ i.location }}</span></td>
+                <td><span class="badge">{{ i.status }}</span></td>
+                <td>{{ i.score }}</td>
+                <td class="right nowrap" v-if="canEdit"><button class="btn sm" @click="edit('Interviews',i)">Edit</button> <button class="btn sm danger" @click="del('Interviews',i)">Hapus</button></td><td v-else></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </template>
+
+      <!-- ===== PENGATURAN ===== -->
+      <template v-if="tab==='settings'">
+        <div class="page-h"><h2>Pengaturan</h2></div>
+        <div class="tabs">
+          <a v-for="t in settingTabs" :key="t.id" :class="{on:stab===t.id}" @click="stab=t.id">{{ t.label }}</a>
+        </div>
+
+        <div v-if="stab==='general'" class="card">
+          <form @submit.prevent="saveSettings">
+            <div class="grid g2" style="gap:0 18px">
+              <div v-for="f in settingFields" :key="f.k" class="field" :style="f.t==='textarea'?'grid-column:1/-1':''">
+                <label v-if="f.t==='checkbox'" class="check"><input type="checkbox" :checked="isTrue(sf[f.k])" @change="sf[f.k]=$event.target.checked?'true':'false'"> {{ f.l }}</label>
+                <template v-else>
+                  <label class="lbl">{{ f.l }}</label>
+                  <textarea v-if="f.t==='textarea'" v-model="sf[f.k]"></textarea>
+                  <div v-else-if="f.t==='color'" class="row" style="flex-wrap:nowrap"><input type="color" v-model="sf[f.k]" style="width:60px"><input v-model="sf[f.k]"></div>
+                  <input v-else v-model="sf[f.k]" :type="f.t||'text'" :placeholder="f.ph||''">
+                </template>
+                <div v-if="f.h" class="small muted" style="margin-top:4px">{{ f.h }}</div>
+              </div>
+            </div>
+            <div class="section" v-if="customSettingKeys.length">
+              <h4>Pengaturan lain</h4>
+              <div class="grid g2" style="gap:0 18px">
+                <div v-for="k in customSettingKeys" :key="k" class="field"><label class="lbl"><code>{{ k }}</code></label><input v-model="sf[k]"></div>
+              </div>
+            </div>
+            <div class="row"><span class="small muted">Link database: <a :href="db.sheetUrl" target="_blank">Spreadsheet</a> · <a :href="db.folderUrl" target="_blank">Folder CV (Drive)</a></span><div class="spacer"></div><button class="btn primary" :disabled="busy">Simpan Pengaturan</button></div>
+          </form>
+        </div>
+
+        <!-- Tahapan -->
+        <div v-if="stab==='stages'">
+          <div class="toolbar"><div class="hint" style="flex:1">Atur tahapan pipeline kandidat. Urutan pertama = tahap awal pelamar baru. Tandai tahap akhir sebagai <b>Diterima</b> / <b>Ditolak</b> untuk statistik.</div><button class="btn primary" @click="edit('Stages',{order:String(db.stages.length+1),color:'#4f46e5'})">+ Tahapan</button></div>
+          <div class="card" style="padding:0">
+            <div v-for="(s,i) in db.stages" :key="s.id" class="list-item">
+              <div class="handle"><button @click="move('Stages',db.stages,i,-1)">▲</button><button @click="move('Stages',db.stages,i,1)">▼</button></div>
+              <span class="swatch" :style="{background:s.color}"></span>
+              <b style="flex:1">{{ s.name }}</b>
+              <span v-if="s.is_final" class="badge">{{ s.is_final==='hired'?'Akhir: Diterima':'Akhir: Ditolak' }}</span>
+              <span class="muted small">{{ byStage(s.id).length }} kandidat</span>
+              <button class="btn sm" @click="edit('Stages',s)">Edit</button><button class="btn sm danger" @click="del('Stages',s)">Hapus</button>
+            </div>
+            <div v-if="!db.stages.length" class="empty">Belum ada tahapan.</div>
+          </div>
+        </div>
+
+        <!-- Form lamaran -->
+        <div v-if="stab==='fields'">
+          <div class="toolbar"><div class="hint" style="flex:1">Field <b>Nama</b>, <b>Email</b>, <b>No. HP</b>, dan <b>Upload CV</b> sudah bawaan. Tambahkan pertanyaan lain di sini — langsung tampil di form lamaran publik.</div><button class="btn primary" @click="edit('FormFields',{order:String(db.fields.length+1),type:'text',active:'true',required:'false'})">+ Field</button></div>
+          <div class="card" style="padding:0">
+            <div v-for="(f,i) in db.fields" :key="f.id" class="list-item">
+              <div class="handle"><button @click="move('FormFields',db.fields,i,-1)">▲</button><button @click="move('FormFields',db.fields,i,1)">▼</button></div>
+              <div style="flex:1"><b>{{ f.label }}</b> <span v-if="isTrue(f.required)" class="req">*</span><div class="small muted"><code>{{ f.key }}</code> · {{ fieldTypeLabel(f.type) }}</div></div>
+              <span class="badge" :class="isTrue(f.active)?'b-open':'b-draft'">{{ isTrue(f.active)?'Aktif':'Nonaktif' }}</span>
+              <button class="btn sm" @click="edit('FormFields',f)">Edit</button><button class="btn sm danger" @click="del('FormFields',f)">Hapus</button>
+            </div>
+            <div v-if="!db.fields.length" class="empty">Belum ada field tambahan.</div>
+          </div>
+        </div>
+
+        <!-- Master data -->
+        <div v-if="stab==='master'">
+          <div class="toolbar"><div class="hint" style="flex:1">Data pilihan untuk dropdown: departemen, lokasi, tipe pekerjaan, sumber kandidat. Anda juga bisa membuat jenis baru.</div><button class="btn primary" @click="edit('Master',{type:mtab})">+ Data</button></div>
+          <div class="tabs"><a v-for="t in masterTypes" :key="t" :class="{on:mtab===t}" @click="mtab=t">{{ masterLabel(t) }}</a></div>
+          <div class="card" style="padding:0">
+            <div v-for="(m,i) in mastersOf(mtab)" :key="m.id" class="list-item">
+              <div class="handle"><button @click="move('Master',mastersOf(mtab),i,-1)">▲</button><button @click="move('Master',mastersOf(mtab),i,1)">▼</button></div>
+              <b style="flex:1">{{ m.value }}</b>
+              <button class="btn sm" @click="edit('Master',m)">Edit</button><button class="btn sm danger" @click="del('Master',m)">Hapus</button>
+            </div>
+            <div v-if="!mastersOf(mtab).length" class="empty">Kosong.</div>
+          </div>
+        </div>
+
+        <!-- Template email -->
+        <div v-if="stab==='templates'">
+          <div class="toolbar"><div class="hint" style="flex:1">Email otomatis dikirim saat kandidat melamar atau pindah ke tahapan tertentu (jika notifikasi email aktif). Variabel: <code v-pre>{{name}}</code> <code v-pre>{{email}}</code> <code v-pre>{{job}}</code> <code v-pre>{{department}}</code> <code v-pre>{{location}}</code> <code v-pre>{{stage}}</code> <code v-pre>{{company}}</code> <code v-pre>{{date}}</code></div><button class="btn primary" @click="edit('EmailTemplates',{active:'true',trigger:'manual'})">+ Template</button></div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>Nama</th><th>Dipicu saat</th><th>Subjek</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr v-if="!db.templates.length"><td colspan="5" class="empty">Belum ada template.</td></tr>
+                <tr v-for="t in db.templates" :key="t.id">
+                  <td><b>{{ t.name }}</b></td><td>{{ triggerLabel(t.trigger) }}</td><td>{{ t.subject }}</td>
+                  <td><span class="badge" :class="isTrue(t.active)?'b-open':'b-draft'">{{ isTrue(t.active)?'Aktif':'Nonaktif' }}</span></td>
+                  <td class="right nowrap"><button class="btn sm" @click="edit('EmailTemplates',t)">Edit</button> <button class="btn sm danger" @click="del('EmailTemplates',t)">Hapus</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Pengguna -->
+        <div v-if="stab==='users'">
+          <div class="toolbar"><div class="hint" style="flex:1"><b>Admin</b>: akses penuh · <b>Recruiter</b>: kelola lowongan, kandidat, interview · <b>Viewer</b>: hanya melihat.</div><button class="btn primary" @click="edit('Users',{role:'recruiter',active:'true'})">+ Pengguna</button></div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>Nama</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                <tr v-for="u in db.users" :key="u.id">
+                  <td><b>{{ u.name }}</b> <span v-if="u.id===user.id" class="badge">Anda</span></td><td>{{ u.email }}</td><td>{{ roleLabel(u.role) }}</td>
+                  <td><span class="badge" :class="isTrue(u.active)?'b-open':'b-closed'">{{ isTrue(u.active)?'Aktif':'Nonaktif' }}</span></td>
+                  <td class="right nowrap"><button class="btn sm" @click="edit('Users',u)">Edit</button> <button v-if="u.id!==user.id" class="btn sm danger" @click="del('Users',u)">Hapus</button></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
+
+      <!-- ===== AKUN ===== -->
+      <template v-if="tab==='account'">
+        <div class="page-h"><h2>Akun Saya</h2></div>
+        <div class="grid g2">
+          <div class="card">
+            <h3>Profil</h3>
+            <form @submit.prevent="saveProfile">
+              <div class="field"><label class="lbl">Nama</label><input v-model="pf.name" required></div>
+              <div class="field"><label class="lbl">Email</label><input :value="user.email" disabled></div>
+              <div class="field"><label class="lbl">Role</label><input :value="roleLabel(user.role)" disabled></div>
+              <button class="btn primary" :disabled="busy">Simpan</button>
+            </form>
+          </div>
+          <div class="card">
+            <h3>Ganti Password</h3>
+            <form @submit.prevent="changePassword">
+              <div class="field"><label class="lbl">Password lama</label><input v-model="pw.old" type="password" required></div>
+              <div class="field"><label class="lbl">Password baru</label><input v-model="pw.new" type="password" minlength="6" required></div>
+              <div class="field"><label class="lbl">Ulangi password baru</label><input v-model="pw.new2" type="password" minlength="6" required></div>
+              <button class="btn primary" :disabled="busy">Ganti Password</button>
+            </form>
+          </div>
+        </div>
+      </template>
+    </main>
+
+    <!-- ===== DRAWER KANDIDAT ===== -->
+    <template v-if="cand">
+      <div class="drawer-bg" @click="candId=null"></div>
+      <div class="drawer">
+        <div class="drawer-h">
+          <div class="row">
+            <div style="flex:1;min-width:0"><h3 style="margin:0">{{ cand.name }}</h3><div class="muted small">{{ jobName(cand.job_id) }} · melamar {{ fmtDate(cand.created_at) }}</div></div>
+            <button class="x" @click="candId=null">×</button>
+          </div>
+          <div class="row" style="margin-top:12px">
+            <select :value="cand.stage_id" @change="moveCand(cand,$event.target.value)" :disabled="!canEdit" style="width:auto;min-width:170px">
+              <option v-for="s in db.stages" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+            <div class="stars"><button v-for="n in 5" :key="n" class="star" :class="{on:n<=Number(cand.rating||0)}" :disabled="!canEdit" @click="setRating(cand,n)">★</button></div>
+            <div class="spacer"></div>
+            <template v-if="canEdit">
+              <button class="btn sm" @click="edit('Candidates',cand)">Edit</button>
+              <button class="btn sm danger" @click="del('Candidates',cand)">Hapus</button>
+            </template>
+          </div>
+        </div>
+        <div class="drawer-b">
+          <div class="section">
+            <h4>Kontak</h4>
+            <dl class="kv">
+              <dt>Email</dt><dd><a :href="'mailto:'+cand.email">{{ cand.email }}</a></dd>
+              <dt>No. HP</dt><dd><a v-if="cand.phone" :href="waLink(cand.phone)" target="_blank">{{ cand.phone }}</a><span v-else>-</span></dd>
+              <dt>Sumber</dt><dd>{{ cand.source || '-' }}</dd>
+              <dt>CV</dt><dd>
+                <a v-if="cand.cv_url" :href="cand.cv_url" target="_blank">📄 {{ cand.cv_name || 'Lihat CV' }}</a><span v-else class="muted">Belum ada</span>
+                <label v-if="canEdit" class="btn sm" style="margin-left:8px">{{ cand.cv_url?'Ganti':'Upload' }}<input type="file" style="display:none" accept=".pdf,.doc,.docx,.odt,.rtf,.txt,.jpg,.jpeg,.png" @change="uploadCV(cand,$event)"></label>
+              </dd>
+            </dl>
+          </div>
+          <div class="section">
+            <h4>Jawaban Form</h4>
+            <dl class="kv" v-if="answerList(cand).length">
+              <template v-for="a in answerList(cand)" :key="a.k"><dt>{{ a.l }}</dt><dd class="pre">{{ a.v }}</dd></template>
+            </dl>
+            <div v-else class="muted">-</div>
+          </div>
+          <div class="section">
+            <h4>Catatan Internal</h4>
+            <textarea v-model="noteDraft" :disabled="!canEdit" placeholder="Tulis catatan tentang kandidat…"></textarea>
+            <div class="row" style="margin-top:8px" v-if="canEdit"><div class="spacer"></div><button class="btn sm primary" :disabled="noteDraft===(cand.notes||'')" @click="saveNote(cand)">Simpan catatan</button></div>
+          </div>
+          <div class="section">
+            <div class="row"><h4 style="margin:0">Interview</h4><div class="spacer"></div><button v-if="canEdit" class="btn sm" @click="edit('Interviews',{candidate_id:cand.id})">+ Jadwalkan</button></div>
+            <div v-if="!candInterviews.length" class="muted" style="margin-top:8px">Belum ada jadwal.</div>
+            <div v-for="i in candInterviews" :key="i.id" class="card" style="padding:12px;margin-top:8px">
+              <div class="row"><b>{{ i.title || 'Interview' }}</b><span class="badge">{{ i.status }}</span><div class="spacer"></div><button v-if="canEdit" class="btn sm" @click="edit('Interviews',i)">Edit</button></div>
+              <div class="small muted">{{ fmtDateTime(i.datetime) }} · {{ i.interviewer }} · {{ i.location }}</div>
+              <div v-if="i.score" class="small">Skor: <b>{{ i.score }}</b></div>
+              <div v-if="i.feedback" class="small pre" style="margin-top:4px">{{ i.feedback }}</div>
+            </div>
+          </div>
+          <div class="section" v-if="canEdit">
+            <h4>Kirim Email</h4>
+            <div class="field"><select v-model="mailTpl" @change="applyTpl"><option value="">— pilih template —</option><option v-for="t in db.templates" :key="t.id" :value="t.id">{{ t.name }}</option></select></div>
+            <div class="field"><input v-model="mail.subject" placeholder="Subjek"></div>
+            <div class="field"><textarea v-model="mail.body" placeholder="Isi email (boleh pakai variabel)"></textarea></div>
+            <div class="row"><div class="spacer"></div><button class="btn sm primary" :disabled="busy||!mail.subject||!mail.body" @click="sendMail(cand)">Kirim ke {{ cand.email }}</button></div>
+          </div>
+          <div class="section">
+            <h4>Riwayat Aktivitas</h4>
+            <div v-if="activityLoading" class="muted">Memuat…</div>
+            <div v-else-if="!activity.length" class="muted">Belum ada aktivitas.</div>
+            <div v-else class="timeline">
+              <div v-for="a in activity" :key="a.id" class="tl-item">
+                <div><b>{{ a.action }}</b> <span class="muted">— {{ a.detail }}</span></div>
+                <div class="small muted">{{ a.user }} · {{ fmtDateTime(a.created_at) }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+
+  <!-- ================= MODAL GENERIK ================= -->
+  <div v-if="modal" class="overlay" @click.self="modal=null">
+    <div class="modal">
+      <div class="modal-h"><h3>{{ modal.rec.id ? 'Edit' : 'Tambah' }} {{ ENT[modal.table].title }}</h3><button class="x" @click="modal=null">×</button></div>
+      <form @submit.prevent="saveModal">
+        <div class="modal-b">
+          <div class="grid g2" style="gap:0 16px">
+            <div v-for="f in ENT[modal.table].fields.filter(f=>!f.show||f.show(modal.rec))" :key="f.k" class="field" :style="f.full||f.t==='textarea'?'grid-column:1/-1':''">
+              <label v-if="f.t==='checkbox'" class="check"><input type="checkbox" :checked="isTrue(modal.rec[f.k])" @change="modal.rec[f.k]=$event.target.checked?'true':'false'"> {{ f.l }}</label>
+              <template v-else>
+                <label class="lbl">{{ f.l }} <span v-if="f.req" class="req">*</span></label>
+                <textarea v-if="f.t==='textarea'" v-model="modal.rec[f.k]" :required="f.req" :rows="f.rows||4" :placeholder="f.ph||''"></textarea>
+                <select v-else-if="f.t==='select'" v-model="modal.rec[f.k]" :required="f.req">
+                  <option value="">—</option>
+                  <option v-for="o in optList(f)" :key="o.v" :value="o.v">{{ o.l }}</option>
+                </select>
+                <template v-else-if="f.t==='combo'">
+                  <input v-model="modal.rec[f.k]" :list="'dl-'+f.k" :required="f.req">
+                  <datalist :id="'dl-'+f.k"><option v-for="o in optList(f)" :key="o.v" :value="o.v">{{ o.l }}</option></datalist>
+                </template>
+                <div v-else-if="f.t==='color'" class="row" style="flex-wrap:nowrap"><input type="color" v-model="modal.rec[f.k]" style="width:60px"><input v-model="modal.rec[f.k]"></div>
+                <input v-else v-model="modal.rec[f.k]" :type="f.t||'text'" :required="f.req && !(f.t==='password' && modal.rec.id)" :placeholder="f.ph && (typeof f.ph==='function'?f.ph(modal.rec):f.ph) || ''">
+              </template>
+              <div v-if="f.h" class="small muted" style="margin-top:4px">{{ f.h }}</div>
+            </div>
+          </div>
+          <div v-if="modal.table==='Candidates' && !modal.rec.id" class="field">
+            <label class="lbl">Upload CV (opsional)</label>
+            <input type="file" accept=".pdf,.doc,.docx,.odt,.rtf,.txt,.jpg,.jpeg,.png" @change="modal.file=$event.target.files[0]">
+          </div>
+        </div>
+        <div class="modal-f"><button type="button" class="btn" @click="modal=null">Batal</button><button class="btn primary" :disabled="busy">{{ busy?'Menyimpan…':'Simpan' }}</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div v-if="toast" class="toast" :class="toast.type">{{ toast.msg }}</div>
+</div>
+</script>

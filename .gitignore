@@ -1,0 +1,5 @@
+node_modules/
+test/db.json
+test/shots/
+test/*.log
+.clasprc.json
