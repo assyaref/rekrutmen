@@ -5,70 +5,115 @@
 
   <!-- ================= CAREERS (PUBLIK) ================= -->
   <div v-else-if="view==='careers'" class="careers">
-    <header class="c-top">
-      <div class="c-container c-top-in">
-        <div class="c-brand-wrap">
-          <img v-if="S.logo_url" :src="S.logo_url" class="logo-img" alt="">
-          <span v-else class="logo-mark">{{ initials(S.company_name) }}</span>
-          <span class="c-brand">{{ S.company_name }}</span>
-        </div>
-        <div class="spacer"></div>
-        <button class="btn ghost sm" @click="goAdmin"><ico n="lock" :s="14"></ico>Masuk Admin</button>
-      </div>
-    </header>
-
     <section class="c-hero">
+      <span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span>
       <div class="c-container">
-        <span class="eyebrow"><span class="pulse"></span>{{ pub.jobs.length }} posisi sedang dibuka</span>
-        <h1>{{ S.careers_title || 'Lowongan Pekerjaan' }}</h1>
-        <p class="lead">{{ S.careers_intro }}</p>
-        <div class="c-search">
-          <div class="input-icon"><ico n="search"></ico><input v-model="cf.q" placeholder="Cari posisi atau kata kunci"></div>
-          <select v-model="cf.dept"><option value="">Semua departemen</option><option v-for="v in pubMaster('department')" :key="v">{{ v }}</option></select>
-          <select v-model="cf.loc"><option value="">Semua lokasi</option><option v-for="v in pubMaster('location')" :key="v">{{ v }}</option></select>
-          <select v-model="cf.type"><option value="">Semua tipe</option><option v-for="v in pubMaster('job_type')" :key="v">{{ v }}</option></select>
+        <div class="c-top-in">
+          <div class="c-brand-wrap">
+            <img v-if="S.logo_url" :src="S.logo_url" class="logo-img" alt="">
+            <span v-else class="logo-mark">{{ initials(S.company_name) }}</span>
+            <span class="c-brand">{{ S.company_name }}</span>
+          </div>
+          <div class="spacer"></div>
+          <button class="btn glass sm" @click="goAdmin"><ico n="lock" :s="14"></ico>Masuk Admin</button>
+        </div>
+        <div class="c-hero-body">
+          <span class="eyebrow"><span class="pulse"></span>Kami sedang merekrut · {{ pub.jobs.length }} posisi terbuka</span>
+          <h1>{{ titleParts[0] }} <span class="hl">{{ titleParts[1] }}</span></h1>
+          <p class="lead">{{ S.careers_intro }}</p>
+          <div class="hero-stats">
+            <div><div class="n">{{ pub.jobs.length }}</div><div class="l">Posisi terbuka</div></div>
+            <span class="sep"></span>
+            <div><div class="n">{{ pubDepts.length }}</div><div class="l">Departemen</div></div>
+            <span class="sep"></span>
+            <div><div class="n">{{ pubLocs }}</div><div class="l">Lokasi kerja</div></div>
+          </div>
         </div>
       </div>
     </section>
 
-    <main class="c-container c-list">
-      <div class="c-list-h"><h2>Posisi terbuka</h2><span class="muted num">{{ pubJobs.length }} lowongan</span></div>
-      <div v-if="!pubJobs.length" class="empty-state">
+    <div class="c-container c-search-wrap">
+      <div class="c-search">
+        <div class="input-icon"><ico n="search" :s="18"></ico><input v-model="cf.q" placeholder="Cari posisi, departemen, atau kata kunci"></div>
+        <select v-model="cf.loc"><option value="">Semua lokasi</option><option v-for="v in pubMaster('location')" :key="v">{{ v }}</option></select>
+        <select v-model="cf.type"><option value="">Semua tipe</option><option v-for="v in pubMaster('job_type')" :key="v">{{ v }}</option></select>
+        <button class="btn primary" @click="scrollToJobs"><ico n="search" :s="16"></ico>Cari</button>
+      </div>
+    </div>
+
+    <main class="c-container c-list" id="jobs">
+      <div class="c-list-h">
+        <div><div class="sec-kicker">Karier</div><h2>Posisi yang sedang dibuka</h2></div>
+        <div class="spacer"></div><span class="muted num">Menampilkan {{ pubJobs.length }} dari {{ pub.jobs.length }} lowongan</span>
+      </div>
+      <div class="chips" v-if="pubDepts.length">
+        <button class="chip all" :class="{on:!cf.dept}" @click="cf.dept=''">Semua <span class="cn">{{ pub.jobs.length }}</span></button>
+        <button v-for="d in pubDepts" :key="d.name" class="chip" :class="{on:cf.dept===d.name}" :style="hueStyle(d.name)" @click="cf.dept=cf.dept===d.name?'':d.name"><span class="cdot"></span>{{ d.name }} <span class="cn">{{ d.count }}</span></button>
+      </div>
+      <div v-if="!pubJobs.length" class="card empty-state">
         <div class="ic"><ico n="briefcase" :s="20"></ico></div>
         <h4>Belum ada lowongan yang sesuai</h4>
         <p>Coba ubah kata kunci atau filter pencarian Anda.</p>
       </div>
-      <article v-for="j in pubJobs" :key="j.id" class="job" @click="openJob(j)">
-        <div class="job-main">
-          <div v-if="j.department" class="job-dept">{{ j.department }}</div>
-          <h3>{{ j.title }}</h3>
-          <div class="meta">
-            <span v-if="j.location"><ico n="pin" :s="14"></ico>{{ j.location }}</span>
-            <span v-if="j.type"><ico n="clock" :s="14"></ico>{{ j.type }}</span>
-            <span v-if="j.salary && isTrue(S.show_salary)"><ico n="wallet" :s="14"></ico>{{ j.salary }}</span>
-            <span v-if="j.deadline"><ico n="calendar" :s="14"></ico>Hingga {{ fmtDate(j.deadline) }}</span>
+      <div class="jobs-grid">
+        <article v-for="j in pubJobs" :key="j.id" class="job" :style="hueStyle(j.department||j.title)" @click="openJob(j)">
+          <div class="job-top">
+            <span class="dept-ic"><ico :n="deptIcon(j.department)" :s="20"></ico></span>
+            <div style="min-width:0"><div class="job-dept">{{ j.department || 'Umum' }}</div></div>
+            <span v-if="isNewJob(j)" class="job-new">Baru</span>
           </div>
-        </div>
-        <div class="job-cta"><span class="go" :title="S.apply_button_text || 'Lamar'"><ico n="arrowRight"></ico></span></div>
-      </article>
+          <h3>{{ j.title }}</h3>
+          <div class="tags">
+            <span v-if="j.location" class="tag loc"><ico n="pin" :s="13"></ico>{{ j.location }}</span>
+            <span v-if="j.type" class="tag type"><ico n="clock" :s="13"></ico>{{ j.type }}</span>
+            <span v-if="j.salary && isTrue(S.show_salary)" class="tag sal"><ico n="wallet" :s="13"></ico>{{ j.salary }}</span>
+          </div>
+          <div class="job-foot">
+            <ico n="calendar" :s="14"></ico><span>{{ j.deadline ? 'Hingga ' + fmtDate(j.deadline) : 'Dibuka hingga terisi' }}</span>
+            <span class="more">{{ S.apply_button_text || 'Lamar' }} <ico n="arrowRight" :s="15"></ico></span>
+          </div>
+        </article>
+      </div>
     </main>
 
+    <section v-if="benefits.length" class="c-container c-benefits">
+      <div class="sec-kicker">Budaya &amp; benefit</div>
+      <h2 style="font-size:24px;font-weight:700;letter-spacing:-.02em">Mengapa bergabung bersama kami</h2>
+      <div class="ben-grid">
+        <div v-for="(b,i) in benefits" :key="i" class="ben" :style="{'--h':[230,165,280,25,200,330][i%6]}">
+          <span class="bi"><ico :n="['users','award','wallet','clock','globe','activity'][i%6]" :s="20"></ico></span>
+          <h4>{{ b.t }}</h4><p>{{ b.d }}</p>
+        </div>
+      </div>
+    </section>
+
+    <div v-if="S.cta_title" class="c-container">
+      <div class="c-cta">
+        <div style="flex:1;min-width:240px"><h3>{{ S.cta_title }}</h3><p>{{ S.cta_text }}</p></div>
+        <a v-if="S.cta_email" class="btn white lg" :href="'mailto:'+S.cta_email"><ico n="mail" :s="16"></ico>Kirim CV Anda</a>
+        <button v-else class="btn white lg" @click="cf.q='';cf.dept='';cf.loc='';cf.type='';scrollToJobs()"><ico n="briefcase" :s="16"></ico>Lihat semua posisi</button>
+      </div>
+    </div>
+
     <footer class="c-foot">
-      <div class="c-container"><span>{{ S.footer_text }}</span><div class="spacer"></div><span v-if="S.tagline" class="faint">{{ S.tagline }}</span></div>
+      <div class="c-container">
+        <div class="c-brand-wrap"><span class="logo-mark">{{ initials(S.company_name) }}</span><span class="c-brand">{{ S.company_name }}</span></div>
+        <div class="spacer"></div><span>{{ S.footer_text }}</span>
+      </div>
     </footer>
 
     <!-- Detail + form lamaran -->
     <div v-if="cj" class="overlay" @click.self="cj=null">
       <div class="modal xl">
-        <div class="modal-h">
+        <div class="modal-h hero-h">
           <div style="min-width:0">
-            <div v-if="cj.department" class="job-dept">{{ cj.department }}</div>
-            <h3 style="font-size:21px;margin-bottom:8px">{{ cj.title }}</h3>
-            <div class="meta">
-              <span v-if="cj.location"><ico n="pin" :s="14"></ico>{{ cj.location }}</span>
-              <span v-if="cj.type"><ico n="clock" :s="14"></ico>{{ cj.type }}</span>
-              <span v-if="cj.salary && isTrue(S.show_salary)"><ico n="wallet" :s="14"></ico>{{ cj.salary }}</span>
-              <span v-if="cj.deadline"><ico n="calendar" :s="14"></ico>Hingga {{ fmtDate(cj.deadline) }}</span>
+            <div class="job-dept" style="margin-bottom:6px">{{ cj.department || 'Umum' }}</div>
+            <h3 style="font-size:23px;margin-bottom:12px;letter-spacing:-.02em">{{ cj.title }}</h3>
+            <div class="tags">
+              <span v-if="cj.location" class="tag"><ico n="pin" :s="13"></ico>{{ cj.location }}</span>
+              <span v-if="cj.type" class="tag"><ico n="clock" :s="13"></ico>{{ cj.type }}</span>
+              <span v-if="cj.salary && isTrue(S.show_salary)" class="tag"><ico n="wallet" :s="13"></ico>{{ cj.salary }}</span>
+              <span v-if="cj.deadline" class="tag"><ico n="calendar" :s="13"></ico>Hingga {{ fmtDate(cj.deadline) }}</span>
             </div>
           </div>
           <button class="x" @click="cj=null" aria-label="Tutup"><ico n="x" :s="18"></ico></button>

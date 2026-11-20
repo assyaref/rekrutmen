@@ -586,7 +586,7 @@ function appUrl_() { try { return ScriptApp.getService().getUrl() || ''; } catch
 /* ======================= SETUP & SEED ======================= */
 function ensureSetup_() {
   const props = PropertiesService.getScriptProperties();
-  if (props.getProperty('SETUP_DONE') === '2') return;
+  if (props.getProperty('SETUP_DONE') === '3') return;
   setup();
 }
 
@@ -615,6 +615,13 @@ function setup() {
     email_from_name: 'Tim Rekrutmen',
     admin_notify_email: '',
     show_salary: 'true',
+    careers_benefits: 'Lingkungan Kolaboratif | Tim yang suportif dan budaya kerja yang saling menghargai.\n' +
+      'Pengembangan Karier | Pelatihan rutin dan jenjang karier yang jelas.\n' +
+      'Benefit Kompetitif | Gaji bersaing, BPJS, dan tunjangan yang menarik.\n' +
+      'Keseimbangan Hidup | Jam kerja yang sehat dan cuti yang memadai.',
+    cta_title: 'Belum menemukan posisi yang cocok?',
+    cta_text: 'Kirimkan CV Anda kepada kami. Kami akan menghubungi Anda saat ada posisi yang sesuai dengan profil Anda.',
+    cta_email: '',
   };
   const missing = {};
   Object.keys(defaults).forEach(function (k) { if (settings[k] === undefined) missing[k] = defaults[k]; });
@@ -698,6 +705,6 @@ function setup() {
 
   // Cek akses folder Drive
   DriveApp.getFolderById(DRIVE_FOLDER_ID).getName();
-  PropertiesService.getScriptProperties().setProperty('SETUP_DONE', '2');
+  PropertiesService.getScriptProperties().setProperty('SETUP_DONE', '3');
   return 'Setup selesai';
 }
