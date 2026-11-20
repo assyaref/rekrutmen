@@ -37,6 +37,13 @@ const WRITE_ROLES = {
 };
 const PRIVATE_SETTING_KEYS = ['admin_notify_email'];
 
+// Fitur yang bisa diaktifkan/nonaktifkan dari Pengaturan → Fitur & Modul (default: aktif)
+const FEATURE_KEYS = [
+  'careers_enabled', 'applications_enabled', 'cv_upload_enabled', 'show_benefits', 'show_cta',
+  'module_interviews', 'module_rating', 'module_notes', 'module_export', 'module_email_manual',
+];
+function feature_(settings, key) { return String(settings[key] === undefined ? 'true' : settings[key]).toLowerCase() !== 'false'; }
+
 /* ======================= WEB APP ======================= */
 function doGet(e) {
   ensureSetup_();
@@ -88,7 +95,8 @@ const PUBLIC_ACTIONS = {
     const settings = getSettings_();
     PRIVATE_SETTING_KEYS.forEach(function (k) { delete settings[k]; });
     const today = todayStr_();
-    const jobs = readAll_('Jobs').filter(function (j) {
+    const careersOn = feature_(settings, 'careers_enabled');
+    const jobs = !careersOn ? [] : readAll_('Jobs').filter(function (j) {
       return j.status === 'Open' && (!j.deadline || String(j.deadline).slice(0, 10) >= today);
     }).map(function (j) { return j; });
     return {
@@ -102,6 +110,11 @@ const PUBLIC_ACTIONS = {
 
   apply: function (d) {
     if (d.website) return { id: 'ok' }; // honeypot anti-bot
+    const fs = getSettings_();
+    if (!feature_(fs, 'careers_enabled') || !feature_(fs, 'applications_enabled')) {
+      throw new Error('Penerimaan lamaran sedang ditutup.');
+    }
+    if (!feature_(fs, 'cv_upload_enabled')) d.file = null;
     const job = findById_('Jobs', d.job_id);
     if (!job || job.status !== 'Open') throw new Error('Lowongan tidak tersedia.');
     const name = String(d.name || '').trim();
@@ -117,7 +130,7 @@ const PUBLIC_ACTIONS = {
           throw new Error('"' + f.label + '" wajib diisi.');
         }
       });
-    if (isTrue_(settings.cv_required) && !(d.file && d.file.data)) throw new Error('CV wajib diunggah.');
+    if (feature_(settings, 'cv_upload_enabled') && isTrue_(settings.cv_required) && !(d.file && d.file.data)) throw new Error('CV wajib diunggah.');
     const dup = readAll_('Candidates').some(function (c) {
       return String(c.email).toLowerCase() === email && c.job_id === job.id;
     });
@@ -145,6 +158,25 @@ const PUBLIC_ACTIONS = {
       } catch (e) { /* abaikan kegagalan email */ }
     }
     return { id: cand.id };
+  },
+
+  /** Logo dari Google Drive dikirim sebagai data URI (tetap tampil walau file tidak dibagikan publik). */
+  logo: function () {
+    const url = String(getSettings_().logo_url || '');
+    const m = url.match(/(?:\/d\/|[?&]id=)([\w-]{20,})/);
+    if (!m) return '';
+    const cache = CacheService.getScriptCache();
+    const key = 'logo_' + m[1];
+    const hit = cache.get(key);
+    if (hit) return hit;
+    const blob = DriveApp.getFileById(m[1]).getBlob();
+    const bytes = blob.getBytes();
+    if (bytes.length > 2 * 1024 * 1024) throw new Error('File logo terlalu besar (maks 2 MB).');
+    const mime = blob.getContentType() || 'image/png';
+    if (mime.indexOf('image/') !== 0) throw new Error('File logo harus berupa gambar.');
+    const uri = 'data:' + mime + ';base64,' + Utilities.base64Encode(bytes);
+    if (uri.length < 95000) cache.put(key, uri, 21600);
+    return uri;
   },
 
   login: function (d) {
@@ -198,6 +230,7 @@ const PRIVATE_ACTIONS = {
   save: function (d, user) {
     const table = d.table;
     requireRole_(user, WRITE_ROLES[table]);
+    if (table === 'Interviews' && !feature_(getSettings_(), 'module_interviews')) throw new Error('Modul interview sedang dinonaktifkan.');
     const rec = sanitizeRecord_(table, d.record || {});
     let before = rec.id ? findById_(table, rec.id) : null;
 
@@ -305,6 +338,7 @@ const PRIVATE_ACTIONS = {
 
   sendEmail: function (d, user) {
     requireRole_(user, ['admin', 'recruiter']);
+    if (!feature_(getSettings_(), 'module_email_manual')) throw new Error('Fitur kirim email sedang dinonaktifkan.');
     const c = findById_('Candidates', d.candidate_id);
     if (!c) throw new Error('Kandidat tidak ditemukan.');
     const vars = tplVars_(c);
@@ -586,7 +620,7 @@ function appUrl_() { try { return ScriptApp.getService().getUrl() || ''; } catch
 /* ======================= SETUP & SEED ======================= */
 function ensureSetup_() {
   const props = PropertiesService.getScriptProperties();
-  if (props.getProperty('SETUP_DONE') === '3') return;
+  if (props.getProperty('SETUP_DONE') === '4') return;
   setup();
 }
 
@@ -615,6 +649,10 @@ function setup() {
     email_from_name: 'Tim Rekrutmen',
     admin_notify_email: '',
     show_salary: 'true',
+    careers_enabled: 'true', applications_enabled: 'true', cv_upload_enabled: 'true',
+    careers_closed_message: 'Saat ini kami belum membuka lowongan. Silakan kembali lagi nanti.',
+    show_benefits: 'true', show_cta: 'true',
+    module_interviews: 'true', module_rating: 'true', module_notes: 'true', module_export: 'true', module_email_manual: 'true',
     careers_benefits: 'Lingkungan Kolaboratif | Tim yang suportif dan budaya kerja yang saling menghargai.\n' +
       'Pengembangan Karier | Pelatihan rutin dan jenjang karier yang jelas.\n' +
       'Benefit Kompetitif | Gaji bersaing, BPJS, dan tunjangan yang menarik.\n' +
@@ -705,6 +743,6 @@ function setup() {
 
   // Cek akses folder Drive
   DriveApp.getFolderById(DRIVE_FOLDER_ID).getName();
-  PropertiesService.getScriptProperties().setProperty('SETUP_DONE', '3');
+  PropertiesService.getScriptProperties().setProperty('SETUP_DONE', '4');
   return 'Setup selesai';
 }

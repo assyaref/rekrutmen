@@ -96,7 +96,7 @@
     template: '#tpl',
     data() {
       return {
-        booting: true, busy: false, view: 'careers', toast: null, sideOpen: false,
+        booting: true, busy: false, logoErr: false, logoData: '', logoTried: false, view: 'careers', toast: null, sideOpen: false,
         pub: { settings: {}, jobs: [], fields: [], masters: [], appUrl: '' },
         cf: { q: '', dept: '', loc: '', type: '' },
         cj: null, applied: false, af: this.blankApply(),
@@ -113,9 +113,29 @@
         jobStatuses: ['Open', 'Closed', 'Draft'],
         interviewStatuses: ['Terjadwal', 'Selesai', 'Dibatalkan', 'Tidak Hadir'],
         settingTabs: [
-          { id: 'general', label: 'Umum & Tampilan' }, { id: 'stages', label: 'Tahapan Seleksi' },
+          { id: 'general', label: 'Umum & Tampilan' }, { id: 'features', label: 'Fitur & Modul' }, { id: 'stages', label: 'Tahapan Seleksi' },
           { id: 'fields', label: 'Form Lamaran' }, { id: 'master', label: 'Data Master' },
           { id: 'templates', label: 'Template Email' }, { id: 'users', label: 'Pengguna' },
+        ],
+        featureGroups: [
+          { title: 'Halaman karir publik', desc: 'Atur apa yang bisa diakses pelamar.', items: [
+            { k: 'careers_enabled', icon: 'globe', l: 'Halaman karir', d: 'Jika dinonaktifkan, halaman karir menampilkan pesan "sedang ditutup" dan lowongan disembunyikan.' },
+            { k: 'applications_enabled', icon: 'inbox', l: 'Terima lamaran baru', d: 'Lowongan tetap tampil, tetapi form lamaran ditutup.' },
+            { k: 'cv_upload_enabled', icon: 'upload', l: 'Upload CV', d: 'Tampilkan kolom upload CV pada form lamaran.' },
+            { k: 'show_salary', icon: 'wallet', l: 'Tampilkan gaji', d: 'Tampilkan rentang gaji pada daftar dan detail lowongan.' },
+            { k: 'show_benefits', icon: 'award', l: 'Bagian "Mengapa bergabung"', d: 'Tampilkan daftar benefit di halaman karir.' },
+            { k: 'show_cta', icon: 'megaphone', l: 'Banner ajakan (CTA)', d: 'Tampilkan banner "Belum menemukan posisi yang cocok?".' },
+          ] },
+          { title: 'Modul panel admin', desc: 'Sembunyikan modul yang tidak dipakai tim Anda.', items: [
+            { k: 'module_interviews', icon: 'calendar', l: 'Interview', d: 'Menu jadwal interview, penjadwalan dari detail kandidat, dan statistiknya.' },
+            { k: 'module_rating', icon: 'star', l: 'Rating kandidat', d: 'Penilaian bintang 1–5 pada kandidat.' },
+            { k: 'module_notes', icon: 'note', l: 'Catatan internal', d: 'Catatan tim pada detail kandidat.' },
+            { k: 'module_email_manual', icon: 'send', l: 'Kirim email manual', d: 'Kirim email ke kandidat langsung dari detail kandidat.' },
+            { k: 'module_export', icon: 'download', l: 'Export CSV', d: 'Tombol unduh data kandidat ke CSV.' },
+          ] },
+          { title: 'Otomatisasi', desc: 'Proses yang berjalan otomatis.', items: [
+            { k: 'email_notifications', icon: 'mail', l: 'Email otomatis ke kandidat', d: 'Kirim email sesuai Template Email saat kandidat melamar atau pindah tahapan.' },
+          ] },
         ],
         settingGroups: [
           { id: 'brand', title: 'Identitas perusahaan', desc: 'Nama, logo, dan warna utama yang dipakai di seluruh aplikasi.' },
@@ -138,11 +158,10 @@
           { g: 'careers', k: 'cta_title', l: 'Judul Ajakan (CTA)', h: 'Kosongkan untuk menyembunyikan banner ajakan.' },
           { g: 'careers', k: 'cta_email', l: 'Email Kirim CV (CTA)', ph: 'karir@perusahaan.com', h: 'Jika diisi, tombol membuka email ke alamat ini.' },
           { g: 'careers', k: 'cta_text', l: 'Teks Ajakan (CTA)', t: 'textarea' },
+          { g: 'careers', k: 'careers_closed_message', l: 'Pesan saat halaman karir ditutup', t: 'textarea', ph: 'Saat ini kami belum membuka lowongan. Silakan kembali lagi nanti.' },
           { g: 'email', k: 'email_from_name', l: 'Nama Pengirim Email' },
           { g: 'email', k: 'admin_notify_email', l: 'Email Notifikasi Admin', ph: 'hr@perusahaan.com', h: 'Dikirimi email setiap ada lamaran baru (pisahkan dengan koma). Kosongkan untuk menonaktifkan.' },
           { g: 'form', k: 'cv_required', l: 'CV wajib diunggah', t: 'checkbox' },
-          { g: 'form', k: 'show_salary', l: 'Tampilkan gaji di halaman karir', t: 'checkbox' },
-          { g: 'email', k: 'email_notifications', l: 'Aktifkan email otomatis ke kandidat', t: 'checkbox' },
         ],
       };
     },
@@ -155,11 +174,11 @@
           { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
           { id: 'jobs', label: 'Lowongan', icon: 'briefcase', count: this.db.jobs.filter(j => j.status === 'Open').length },
           { id: 'candidates', label: 'Kandidat', icon: 'users', count: this.db.candidates.length },
-          { id: 'interviews', label: 'Interview', icon: 'calendar', count: this.upcomingInterviews.length },
+          { id: 'interviews', label: 'Interview', icon: 'calendar', count: this.upcomingInterviews.length, off: !this.feat('module_interviews') },
         ];
         if (this.isAdmin) m.push({ id: 'settings', label: 'Pengaturan', icon: 'sliders' });
         m.push({ id: 'account', label: 'Akun Saya', icon: 'user' });
-        return m;
+        return m.filter(x => !x.off);
       },
       pubJobs() {
         const q = this.cf.q.toLowerCase();
@@ -174,6 +193,41 @@
         this.pub.jobs.forEach(j => { if (j.department) m[j.department] = (m[j.department] || 0) + 1; });
         return Object.keys(m).sort().map(name => ({ name, count: m[name] }));
       },
+      logoSrc() {
+        if (this.logoData) return this.logoData;
+        const u = String(this.S.logo_url || '').trim();
+        const m = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]{20,})/);
+        return m ? 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400' : u;
+      },
+      todayLabel() { const d = new Date(); return ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][d.getDay()] + ', ' + this.fmtDate(d.toISOString()); },
+      new7() { const t = Date.now() - 7 * 864e5; return this.db.candidates.filter(c => (parseD(c.created_at) || 0) >= t).length; },
+      interviewsToday() { const k = new Date().toDateString(); return this.upcomingInterviews.filter(i => { const d = parseD(i.datetime); return d && d.toDateString() === k; }).length; },
+      hireRate() { const n = this.db.candidates.length; return n ? Math.round(this.countFinal('hired') * 100 / n) : 0; },
+      trend() {
+        const days = [], counts = {};
+        this.db.candidates.forEach(c => { const d = parseD(c.created_at); if (d) { const k = d.toDateString(); counts[k] = (counts[k] || 0) + 1; } });
+        for (let i = 13; i >= 0; i--) {
+          const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
+          days.push({ key: d.toDateString(), count: counts[d.toDateString()] || 0, short: d.getDate() + ' ' + MONTHS[d.getMonth()], full: this.fmtDate(d.toISOString()) });
+        }
+        return days;
+      },
+      trendMax() { return Math.max(1, ...this.trend.map(t => t.count)); },
+      sources() {
+        const m = {}, n = this.db.candidates.length;
+        this.db.candidates.forEach(c => { const k = c.source || 'Tidak diketahui'; m[k] = (m[k] || 0) + 1; });
+        let arr = Object.keys(m).map(name => ({ name, count: m[name] })).sort((a, b) => b.count - a.count);
+        if (arr.length > 5) { const rest = arr.slice(4).reduce((a, x) => a + x.count, 0); arr = arr.slice(0, 4).concat([{ name: 'Lainnya', count: rest }]); }
+        const order = this.mastersOf('source').map(m => m.value);
+        const extra = Object.keys(m).filter(k => !order.includes(k)).sort();
+        const slot = k => { const i = order.indexOf(k); return (i >= 0 ? i : order.length + extra.indexOf(k)) % 6 + 1; };
+        return arr.map(x => ({ ...x, pct: n ? Math.round(x.count * 100 / n) : 0, color: x.name === 'Lainnya' ? '#a1a1aa' : 'var(--series-' + slot(x.name) + ')' }));
+      },
+      jobsByApplicants() {
+        return this.db.jobs.map(j => ({ ...j, n: this.db.candidates.filter(c => c.job_id === j.id).length }))
+          .sort((a, b) => b.n - a.n || (a.status === 'Open' ? -1 : 1)).slice(0, 6);
+      },
+      jobMax() { return Math.max(1, ...this.jobsByApplicants.map(j => j.n)); },
       pubLocs() { return new Set(this.pub.jobs.map(j => j.location).filter(Boolean)).size; },
       titleParts() {
         const w = String(this.S.careers_title || 'Lowongan Pekerjaan').trim().split(/\s+/);
@@ -337,6 +391,29 @@
     },
     methods: {
       isTrue,
+      async onLogoError() {
+        // Gambar Drive gagal dimuat (mis. file tidak publik) → ambil lewat backend Apps Script
+        if (!this.logoTried && /drive\.google\.com/.test(String(this.S.logo_url || ''))) {
+          this.logoTried = true;
+          try { const uri = await call('logo'); if (uri) { this.logoData = uri; return; } } catch (e) {}
+        }
+        this.logoErr = true;
+      },
+      feat(k) { const v = this.S[k]; return v === undefined || v === '' ? true : String(v).toLowerCase() !== 'false'; },
+      async toggleFeature(k) {
+        const val = this.feat(k) ? 'false' : 'true';
+        const prev = this.db.settings[k];
+        this.db.settings[k] = val; this.sf[k] = val;
+        try {
+          const s = await this.api('saveSettings', { settings: { [k]: val } });
+          this.db.settings = s; this.sf = Object.assign({}, this.sf, { [k]: s[k] });
+          this.pub.settings = Object.assign({}, this.pub.settings, { [k]: s[k] });
+          this.notify((val === 'true' ? 'Diaktifkan: ' : 'Dinonaktifkan: ') + this.featureLabel(k), 'success');
+          if (k === 'module_interviews' && val === 'false' && this.tab === 'interviews') this.tab = 'dashboard';
+          if (['careers_enabled', 'applications_enabled', 'cv_upload_enabled'].includes(k)) { try { this.pub = await call('publicData'); } catch (e) {} }
+        } catch (e) { this.db.settings[k] = prev; this.sf[k] = prev; this.notify(e.message, 'error'); }
+      },
+      featureLabel(k) { for (const g of this.featureGroups) { const f = g.items.find(x => x.k === k); if (f) return f.l; } return k; },
       blankApply() { return { name: '', email: '', phone: '', answers: {}, file: null, website: '' }; },
       notify(msg, type) {
         this.toast = { msg, type: type || '' };
@@ -356,9 +433,19 @@
         finally { this.busy = false; }
       },
       applyTheme(s) {
-        const c = (s && s.primary_color) || '#4f46e5';
-        document.documentElement.style.setProperty('--p', c);
-        document.documentElement.style.setProperty('--p-soft', c + '14');
+        let c = String((s && s.primary_color) || '#4f46e5').trim();
+        if (!/^#[0-9a-f]{6}$/i.test(c)) c = '#4f46e5';
+        const rgb = [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16) / 255)
+          .map(v => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+        const lum = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+        const root = document.documentElement.style;
+        root.setProperty('--p', c);
+        root.setProperty('--p-soft', c + '1a');
+        root.setProperty('--p-ring', c + '40');
+        // Warna terang (mis. kuning): teks di atas warna utama jadi gelap, teks berwarna dibuat lebih pekat
+        root.setProperty('--p-on', lum > 0.45 ? '#1c1917' : '#ffffff');
+        root.setProperty('--p-ink', lum > 0.45 ? 'color-mix(in srgb,' + c + ' 52%,#000)' : lum > 0.25 ? 'color-mix(in srgb,' + c + ' 75%,#000)' : c);
+        if (s && s.logo_url !== this._logoUrl) { this._logoUrl = s.logo_url; this.logoErr = false; this.logoData = ''; this.logoTried = false; }
         if (s && s.company_name) document.title = 'Karir · ' + s.company_name;
       },
       opts(s) { return String(s || '').split(/\n|,/).map(x => x.trim()).filter(Boolean); },

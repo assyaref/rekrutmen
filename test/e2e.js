@@ -119,6 +119,46 @@ const OUT = process.argv[2] || '.';
     await p.waitForSelector('.modal label:has-text("Bersedia ditempatkan")');
   });
   await p.screenshot({ path: OUT + '/7-careers-updated.png' });
+  await step('feature toggles: close applications & careers page', async () => {
+    await p.click('.modal .x');
+    await p.click('button:has-text("Masuk Admin")');
+    await p.waitForSelector('.layout .nav');
+    await p.click('.nav a:has-text("Pengaturan")');
+    await p.click('.tabs a:has-text("Fitur")');
+    await p.screenshot({ path: OUT + '/9-features.png' });
+    await p.click('button.switch[data-key=applications_enabled]');
+    await p.waitForSelector('.toast:has-text("Dinonaktifkan")');
+    await p.click('button.switch[data-key=module_interviews]');
+    await p.waitForSelector('.toast:has-text("Dinonaktifkan: Interview")');
+    if (await p.locator('.nav a:has-text("Interview")').count()) throw new Error('menu Interview masih tampil');
+    await p.click('.nav a:has-text("Halaman Karir")');
+    await p.click('.job');
+    await p.waitForSelector('.modal .closed-box:has-text("Penerimaan lamaran sedang ditutup")');
+    const r = await (await fetch('http://localhost:8080/rpc', { method: 'POST', body: JSON.stringify({ action: 'apply', data: { job_id: 'x', name: 'A', email: 'a@b.co' } }) })).json();
+    if (r.ok || !/ditutup/.test(r.error)) throw new Error('server tidak memblokir lamaran: ' + JSON.stringify(r));
+    await p.click('.modal .x');
+    await p.click('button:has-text("Masuk Admin")');
+    await p.click('.nav a:has-text("Pengaturan")');
+    await p.click('.tabs a:has-text("Fitur")');
+    await p.click('button.switch[data-key=careers_enabled]');
+    await p.waitForSelector('.toast:has-text("Dinonaktifkan: Halaman karir")');
+    await p.click('.nav a:has-text("Halaman Karir")');
+    await p.waitForSelector('.closed-box:has-text("Halaman karir sedang ditutup")');
+    await p.screenshot({ path: OUT + '/10-careers-closed.png' });
+    // aktifkan kembali semuanya
+    await p.click('button:has-text("Masuk Admin")');
+    await p.click('.nav a:has-text("Pengaturan")');
+    await p.click('.tabs a:has-text("Fitur")');
+    for (const k of ['careers_enabled', 'applications_enabled', 'module_interviews']) {
+      await p.click('button.switch[data-key=' + k + ']');
+      await p.waitForSelector('button.switch.on[data-key=' + k + ']');
+      await p.waitForTimeout(600);
+    }
+    await p.click('.nav a:has-text("Halaman Karir")');
+    await p.click('.job');
+    await p.waitForSelector('.modal .apply-panel');
+    await p.click('.modal .x');
+  });
   const m = await p.setViewportSize({ width: 390, height: 844 });
   await p.goto('http://localhost:8080/?page=admin');
   await p.waitForTimeout(800);

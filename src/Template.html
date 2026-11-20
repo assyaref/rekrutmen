@@ -10,7 +10,7 @@
       <div class="c-container">
         <div class="c-top-in">
           <div class="c-brand-wrap">
-            <img v-if="S.logo_url" :src="S.logo_url" class="logo-img" alt="">
+            <img v-if="logoSrc && !logoErr" :src="logoSrc" @error="onLogoError" class="logo-img" alt="">
             <span v-else class="logo-mark">{{ initials(S.company_name) }}</span>
             <span class="c-brand">{{ S.company_name }}</span>
           </div>
@@ -18,10 +18,10 @@
           <button class="btn glass sm" @click="goAdmin"><ico n="lock" :s="14"></ico>Masuk Admin</button>
         </div>
         <div class="c-hero-body">
-          <span class="eyebrow"><span class="pulse"></span>Kami sedang merekrut · {{ pub.jobs.length }} posisi terbuka</span>
+          <span v-if="feat('careers_enabled')" class="eyebrow"><span class="pulse"></span>Kami sedang merekrut · {{ pub.jobs.length }} posisi terbuka</span>
           <h1>{{ titleParts[0] }} <span class="hl">{{ titleParts[1] }}</span></h1>
           <p class="lead">{{ S.careers_intro }}</p>
-          <div class="hero-stats">
+          <div v-if="feat('careers_enabled')" class="hero-stats">
             <div><div class="n">{{ pub.jobs.length }}</div><div class="l">Posisi terbuka</div></div>
             <span class="sep"></span>
             <div><div class="n">{{ pubDepts.length }}</div><div class="l">Departemen</div></div>
@@ -32,7 +32,7 @@
       </div>
     </section>
 
-    <div class="c-container c-search-wrap">
+    <div v-if="feat('careers_enabled')" class="c-container c-search-wrap">
       <div class="c-search">
         <div class="input-icon"><ico n="search" :s="18"></ico><input v-model="cf.q" placeholder="Cari posisi, departemen, atau kata kunci"></div>
         <select v-model="cf.loc"><option value="">Semua lokasi</option><option v-for="v in pubMaster('location')" :key="v">{{ v }}</option></select>
@@ -41,7 +41,14 @@
       </div>
     </div>
 
-    <main class="c-container c-list" id="jobs">
+    <div v-if="!feat('careers_enabled')" class="c-container c-closed">
+      <div class="closed-box">
+        <div class="ic"><ico n="lock" :s="24"></ico></div>
+        <h3>Halaman karir sedang ditutup</h3>
+        <p class="pre">{{ S.careers_closed_message || 'Saat ini kami belum membuka lowongan. Silakan kembali lagi nanti.' }}</p>
+      </div>
+    </div>
+    <main v-else class="c-container c-list" id="jobs">
       <div class="c-list-h">
         <div><div class="sec-kicker">Karier</div><h2>Posisi yang sedang dibuka</h2></div>
         <div class="spacer"></div><span class="muted num">Menampilkan {{ pubJobs.length }} dari {{ pub.jobs.length }} lowongan</span>
@@ -76,7 +83,7 @@
       </div>
     </main>
 
-    <section v-if="benefits.length" class="c-container c-benefits">
+    <section v-if="benefits.length && feat('show_benefits')" class="c-container c-benefits">
       <div class="sec-kicker">Budaya &amp; benefit</div>
       <h2 style="font-size:24px;font-weight:700;letter-spacing:-.02em">Mengapa bergabung bersama kami</h2>
       <div class="ben-grid">
@@ -87,7 +94,7 @@
       </div>
     </section>
 
-    <div v-if="S.cta_title" class="c-container">
+    <div v-if="S.cta_title && feat('show_cta') && feat('careers_enabled')" class="c-container">
       <div class="c-cta">
         <div style="flex:1;min-width:240px"><h3>{{ S.cta_title }}</h3><p>{{ S.cta_text }}</p></div>
         <a v-if="S.cta_email" class="btn white lg" :href="'mailto:'+S.cta_email"><ico n="mail" :s="16"></ico>Kirim CV Anda</a>
@@ -130,7 +137,12 @@
               <div v-if="cj.description" class="blk"><h4>Deskripsi pekerjaan</h4><div class="pre">{{ cj.description }}</div></div>
               <div v-if="cj.requirements" class="blk"><h4>Kualifikasi</h4><div class="pre">{{ cj.requirements }}</div></div>
             </div>
-            <div class="apply-panel">
+            <div v-if="!feat('applications_enabled')" class="closed-box" style="padding:32px 20px;box-shadow:none">
+              <div class="ic"><ico n="lock" :s="22"></ico></div>
+              <h3>Penerimaan lamaran sedang ditutup</h3>
+              <p>Silakan kembali lagi nanti untuk melamar posisi ini.</p>
+            </div>
+            <div v-else class="apply-panel">
               <h3>Form lamaran</h3>
               <p class="muted small" style="margin:4px 0 20px">Isi data di bawah ini. Kolom bertanda <span class="req">*</span> wajib diisi.</p>
               <form @submit.prevent="submitApply">
@@ -154,7 +166,7 @@
                     <input v-else v-model="af.answers[f.key]" :type="f.type||'text'" :placeholder="f.placeholder" :required="isTrue(f.required)">
                   </div>
                 </div>
-                <div class="field">
+                <div class="field" v-if="feat('cv_upload_enabled')">
                   <label class="lbl">{{ S.cv_label || 'Upload CV' }} <span v-if="isTrue(S.cv_required)" class="req">*</span></label>
                   <label class="dropzone">
                     <span class="dz-ic"><ico :n="af.file ? 'file' : 'upload'" :s="18"></ico></span>
@@ -180,7 +192,7 @@
   <div v-else-if="view==='login'" class="login">
     <div class="login-art">
       <div class="row" style="gap:12px">
-        <img v-if="S.logo_url" :src="S.logo_url" class="logo-img" style="background:#fff;padding:3px" alt="">
+        <img v-if="logoSrc && !logoErr" :src="logoSrc" @error="onLogoError" class="logo-img" style="background:#fff;padding:3px" alt="">
         <span v-else class="logo-mark lg">{{ initials(S.company_name) }}</span>
         <b style="font-size:16px">{{ S.company_name }}</b>
       </div>
@@ -212,7 +224,7 @@
     </div>
     <aside class="side" :class="{open:sideOpen}">
       <div class="side-brand">
-        <img v-if="S.logo_url" :src="S.logo_url" class="logo-img" alt="">
+        <img v-if="logoSrc && !logoErr" :src="logoSrc" @error="onLogoError" class="logo-img" alt="">
         <span v-else class="logo-mark">{{ initials(S.company_name) }}</span>
         <span>{{ S.company_name || 'Rekrutmen' }}</span>
       </div>
@@ -236,35 +248,88 @@
     <main class="main">
       <!-- ===== DASHBOARD ===== -->
       <template v-if="tab==='dashboard'">
-        <div class="page-h">
-          <div><h2>Selamat datang, {{ firstName(user.name) }}</h2><p class="sub">Ringkasan aktivitas rekrutmen hari ini.</p></div>
-          <div class="spacer"></div>
-          <button class="btn" @click="reload"><ico n="refresh" :s="15"></ico>Muat ulang</button>
+        <div class="welcome">
+          <div style="flex:1;min-width:240px">
+            <div class="date">{{ todayLabel }}</div>
+            <h2>Selamat datang, {{ firstName(user.name) }}</h2>
+            <p>{{ new7 ? new7 + ' lamaran baru dalam 7 hari terakhir.' : 'Belum ada lamaran baru minggu ini.' }} {{ upcomingInterviews.length ? upcomingInterviews.length + ' interview menunggu.' : '' }}</p>
+          </div>
+          <button class="btn glass" @click="reload"><ico n="refresh" :s="15"></ico>Muat ulang</button>
+          <button v-if="canEdit" class="btn white" @click="tab='jobs';edit('Jobs')"><ico n="plus" :s="15"></ico>Lowongan baru</button>
         </div>
-        <div class="grid g4" style="margin-bottom:16px">
-          <div class="card stat"><span class="si"><ico n="users" :s="18"></ico></span><div><div class="n">{{ db.candidates.length }}</div><div class="l">Total kandidat</div></div></div>
-          <div class="card stat"><span class="si gray"><ico n="briefcase" :s="18"></ico></span><div><div class="n">{{ db.jobs.filter(j=>j.status==='Open').length }}</div><div class="l">Lowongan aktif</div></div></div>
-          <div class="card stat"><span class="si warn"><ico n="calendar" :s="18"></ico></span><div><div class="n">{{ upcomingInterviews.length }}</div><div class="l">Interview mendatang</div></div></div>
-          <div class="card stat"><span class="si ok"><ico n="award" :s="18"></ico></span><div><div class="n">{{ countFinal('hired') }}</div><div class="l">Diterima</div></div></div>
+
+        <div class="grid kpis" :class="feat('module_interviews') ? 'g4' : 'g3'" style="margin-bottom:16px">
+          <div class="card kpi k1 stat">
+            <div class="kh"><span class="ki"><ico n="users" :s="17"></ico></span>Total kandidat</div>
+            <div class="n">{{ db.candidates.length }}</div>
+            <span class="delta" :class="{up:new7}"><ico :n="new7?'up':'activity'" :s="12"></ico>{{ new7 }} dalam 7 hari</span>
+          </div>
+          <div class="card kpi k2 stat">
+            <div class="kh"><span class="ki"><ico n="briefcase" :s="17"></ico></span>Lowongan aktif</div>
+            <div class="n">{{ db.jobs.filter(j=>j.status==='Open').length }}</div>
+            <span class="delta">dari {{ db.jobs.length }} lowongan</span>
+          </div>
+          <div v-if="feat('module_interviews')" class="card kpi k3 stat">
+            <div class="kh"><span class="ki"><ico n="calendar" :s="17"></ico></span>Interview mendatang</div>
+            <div class="n">{{ upcomingInterviews.length }}</div>
+            <span class="delta">{{ interviewsToday }} hari ini</span>
+          </div>
+          <div class="card kpi k4 stat">
+            <div class="kh"><span class="ki"><ico n="award" :s="17"></ico></span>Diterima</div>
+            <div class="n">{{ countFinal('hired') }}</div>
+            <span class="delta" :class="{up:countFinal('hired')}">{{ hireRate }}% tingkat penerimaan</span>
+          </div>
         </div>
-        <div class="grid g2">
-          <div class="card">
-            <div class="card-h"><h3>Pipeline kandidat</h3><div class="spacer"></div><a href="#" class="small" @click.prevent="tab='candidates'">Lihat semua</a></div>
-            <div v-for="s in db.stages" :key="s.id" class="pipe-row">
-              <div class="row"><span class="dot" :style="{background:s.color}"></span>{{ s.name }}<div class="spacer"></div><b class="num">{{ byStage(s.id).length }}</b><span class="muted small num" style="width:38px;text-align:right">{{ pct(byStage(s.id).length) }}%</span></div>
+
+        <div class="g-dash" style="margin-bottom:16px">
+          <div class="card chart s2">
+            <div class="card-h"><span class="ci"><ico n="activity" :s="16"></ico></span><div><h3>Tren lamaran masuk</h3><div class="sub">14 hari terakhir · total {{ trend.reduce((a,t)=>a+t.count,0) }} lamaran</div></div></div>
+            <div class="trend" role="img" :aria-label="'Grafik lamaran 14 hari terakhir'">
+              <div v-for="(t,i) in trend" :key="t.key" class="tcol" :class="{'edge-l':i<3,'edge-r':i>trend.length-4}">
+                <span class="tip">{{ t.full }} · <b>{{ t.count }}</b> lamaran</span>
+                <span v-if="t.count && t.count===trendMax" class="val" :style="{bottom:(t.count/trendMax*100)+'%',marginBottom:'4px'}">{{ t.count }}</span>
+                <div class="tbar" :class="{zero:!t.count}" :style="{height:(t.count/trendMax*100)+'%'}"></div>
+              </div>
+            </div>
+            <div class="taxis"><span v-for="(t,i) in trend" :key="t.key">{{ i%2===0 || i===trend.length-1 ? t.short : '' }}</span></div>
+          </div>
+          <div class="card chart">
+            <div class="card-h"><span class="ci"><ico n="globe" :s="16"></ico></span><div><h3>Sumber kandidat</h3><div class="sub">Dari mana kandidat datang</div></div></div>
+            <div v-if="!sources.length" class="empty-state" style="padding:24px"><div class="ic"><ico n="inbox" :s="20"></ico></div><p>Belum ada data.</p></div>
+            <template v-else>
+              <div class="stackbar"><i v-for="(s,i) in sources" :key="s.name" :title="s.name+': '+s.count" :style="{width:s.pct+'%',background:s.color}"></i></div>
+              <div v-for="(s,i) in sources" :key="s.name" class="hbar-row" :title="s.name+': '+s.count+' kandidat'">
+                <span class="nm"><span class="legend-sw" :style="{background:s.color}"></span>{{ s.name }}</span>
+                <span class="vv">{{ s.count }}<small>{{ s.pct }}%</small></span>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <div class="grid g2" style="margin-bottom:16px">
+          <div class="card chart">
+            <div class="card-h"><span class="ci"><ico n="columns" :s="16"></ico></span><div><h3>Pipeline kandidat</h3><div class="sub">Sebaran per tahapan seleksi</div></div><div class="spacer"></div><a href="#" class="small" @click.prevent="tab='candidates'">Lihat semua</a></div>
+            <div class="stackbar" v-if="db.candidates.length"><i v-for="s in db.stages.filter(s=>byStage(s.id).length)" :key="s.id" :title="s.name+': '+byStage(s.id).length" :style="{width:pct(byStage(s.id).length)+'%',background:s.color}"></i></div>
+            <div v-for="s in db.stages" :key="s.id" class="hbar-row" style="cursor:pointer" @click="tab='candidates';kf.mode='table';kf.stage=s.id">
+              <span class="nm"><span class="legend-sw" :style="{background:s.color}"></span>{{ s.name }}</span>
+              <span class="vv">{{ byStage(s.id).length }}<small>{{ pct(byStage(s.id).length) }}%</small></span>
               <div class="bar"><i :style="{width:pct(byStage(s.id).length)+'%',background:s.color}"></i></div>
             </div>
           </div>
-          <div class="card">
-            <div class="card-h"><h3>Kandidat per lowongan</h3><div class="spacer"></div><a href="#" class="small" @click.prevent="tab='jobs'">Kelola</a></div>
+          <div class="card chart">
+            <div class="card-h"><span class="ci"><ico n="briefcase" :s="16"></ico></span><div><h3>Kandidat per lowongan</h3><div class="sub">Lowongan dengan pelamar terbanyak</div></div><div class="spacer"></div><a href="#" class="small" @click.prevent="tab='jobs'">Kelola</a></div>
             <div v-if="!db.jobs.length" class="muted">Belum ada lowongan.</div>
-            <div v-for="j in db.jobs" :key="j.id" class="pipe-row">
-              <div class="row"><span style="font-weight:500">{{ j.title }}</span><span class="badge" :class="statusCls(j.status)">{{ statusLabel(j.status) }}</span><div class="spacer"></div><b class="num">{{ db.candidates.filter(c=>c.job_id===j.id).length }}</b></div>
-              <div class="bar"><i :style="{width:pct(db.candidates.filter(c=>c.job_id===j.id).length)+'%',background:'var(--p)'}"></i></div>
+            <div v-for="j in jobsByApplicants" :key="j.id" class="hbar-row" style="cursor:pointer" @click="tab='candidates';kf.job=j.id">
+              <span class="nm">{{ j.title }} <span class="badge" :class="statusCls(j.status)">{{ statusLabel(j.status) }}</span></span>
+              <span class="vv">{{ j.n }}</span>
+              <div class="bar"><i :style="{width:(jobMax? j.n/jobMax*100 : 0)+'%',background:'linear-gradient(90deg,color-mix(in srgb,var(--p) 70%,#fff),var(--p))'}"></i></div>
             </div>
           </div>
+        </div>
+
+        <div class="grid g2">
           <div class="card">
-            <div class="card-h"><h3>Pelamar terbaru</h3></div>
+            <div class="card-h"><span class="ci"><ico n="inbox" :s="16"></ico></span><h3>Pelamar terbaru</h3></div>
             <div v-if="!db.candidates.length" class="empty-state" style="padding:24px"><div class="ic"><ico n="inbox" :s="20"></ico></div><p>Belum ada pelamar.</p></div>
             <div v-for="c in recentCandidates" :key="c.id" class="list-row" @click="openCand(c.id)">
               <span class="avatar" :style="avStyle(c.name)">{{ initials(c.name) }}</span>
@@ -272,8 +337,8 @@
               <div class="right"><span class="badge outline"><span class="dot" :style="{background:stageColor(c.stage_id)}"></span>{{ stageName(c.stage_id) }}</span><div class="faint small" style="margin-top:3px">{{ fmtDate(c.created_at) }}</div></div>
             </div>
           </div>
-          <div class="card">
-            <div class="card-h"><h3>Interview mendatang</h3><div class="spacer"></div><a href="#" class="small" @click.prevent="tab='interviews'">Jadwal</a></div>
+          <div v-if="feat('module_interviews')" class="card">
+            <div class="card-h"><span class="ci"><ico n="calendar" :s="16"></ico></span><h3>Interview mendatang</h3><div class="spacer"></div><a href="#" class="small" @click.prevent="tab='interviews'">Jadwal</a></div>
             <div v-if="!upcomingInterviews.length" class="empty-state" style="padding:24px"><div class="ic"><ico n="calendar" :s="20"></ico></div><p>Tidak ada jadwal.</p></div>
             <div v-for="i in upcomingInterviews.slice(0,6)" :key="i.id" class="list-row" @click="openCand(i.candidate_id)">
               <span class="date-box"><span class="m">{{ monthShort(i.datetime) }}</span><span class="d">{{ dayNum(i.datetime) }}</span></span>
@@ -327,7 +392,7 @@
           <div><h2>Kandidat</h2><p class="sub">{{ filteredCands.length }} kandidat · seret kartu untuk memindahkan tahapan.</p></div>
           <div class="spacer"></div>
           <div class="seg"><button :class="{on:kf.mode==='kanban'}" @click="kf.mode='kanban'"><ico n="columns" :s="14"></ico>Kanban</button><button :class="{on:kf.mode==='table'}" @click="kf.mode='table'"><ico n="list" :s="14"></ico>Tabel</button></div>
-          <button class="btn" @click="exportCSV"><ico n="download" :s="15"></ico>Export</button>
+          <button v-if="feat('module_export')" class="btn" @click="exportCSV"><ico n="download" :s="15"></ico>Export</button>
           <button v-if="canEdit" class="btn primary" @click="edit('Candidates',{job_id:kf.job})"><ico n="plus" :s="16"></ico>Tambah Kandidat</button>
         </div>
         <div class="toolbar">
@@ -348,7 +413,7 @@
                   <div style="min-width:0"><div class="nm">{{ c.name }}</div><div class="jb">{{ jobName(c.job_id) }}</div></div>
                 </div>
                 <div class="ft">
-                  <span v-if="Number(c.rating)" class="row" style="gap:3px;color:#f59e0b"><ico n="star" :s="12" fill></ico><b class="num" style="color:var(--text-2)">{{ c.rating }}</b></span>
+                  <span v-if="feat('module_rating') && Number(c.rating)" class="row" style="gap:3px;color:#f59e0b"><ico n="star" :s="12" fill></ico><b class="num" style="color:var(--text-2)">{{ c.rating }}</b></span>
                   <ico v-if="c.cv_url" n="file" :s="13"></ico>
                   <div class="spacer"></div><span class="num">{{ fmtDate(c.created_at) }}</span>
                 </div>
@@ -445,6 +510,22 @@
               <button class="btn primary" :disabled="busy">Simpan Pengaturan</button>
             </div>
           </form>
+        </div>
+
+        <!-- Fitur & Modul -->
+        <div v-if="stab==='features'">
+          <div class="toolbar"><div class="hint" style="flex:1"><ico n="info" :s="16"></ico><span>Aktifkan atau nonaktifkan fitur dengan satu klik — perubahan langsung tersimpan dan berlaku untuk semua pengguna. Data yang sudah ada tidak dihapus.</span></div></div>
+          <div v-for="g in featureGroups" :key="g.title" class="feat-group">
+            <h3>{{ g.title }}</h3><p class="desc">{{ g.desc }}</p>
+            <div class="list-card">
+              <div v-for="f in g.items" :key="f.k" class="feat-row" :class="{on:feat(f.k)}">
+                <span class="fi"><ico :n="f.icon" :s="17"></ico></span>
+                <div style="flex:1;min-width:0"><div class="ft">{{ f.l }}</div><div class="fd">{{ f.d }}</div></div>
+                <span class="st">{{ feat(f.k) ? 'Aktif' : 'Nonaktif' }}</span>
+                <button class="switch" :class="{on:feat(f.k)}" role="switch" :aria-checked="feat(f.k)" :aria-label="f.l" :data-key="f.k" @click="toggleFeature(f.k)"></button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Tahapan -->
@@ -569,7 +650,7 @@
             <select :value="cand.stage_id" @change="moveCand(cand,$event.target.value)" :disabled="!canEdit" style="width:auto;min-width:180px;height:34px">
               <option v-for="s in db.stages" :key="s.id" :value="s.id">{{ s.name }}</option>
             </select>
-            <div class="stars"><button v-for="n in 5" :key="n" class="star" :class="{on:n<=Number(cand.rating||0)}" :disabled="!canEdit" :title="n+' bintang'" @click="setRating(cand,n)"><ico n="star" :s="18" fill></ico></button></div>
+            <div v-if="feat('module_rating')" class="stars"><button v-for="n in 5" :key="n" class="star" :class="{on:n<=Number(cand.rating||0)}" :disabled="!canEdit" :title="n+' bintang'" @click="setRating(cand,n)"><ico n="star" :s="18" fill></ico></button></div>
             <div class="spacer"></div>
             <template v-if="canEdit">
               <button class="btn sm" @click="edit('Candidates',cand)"><ico n="edit" :s="14"></ico>Edit</button>
@@ -597,12 +678,12 @@
             </dl>
             <div v-else class="faint">Tidak ada jawaban tambahan.</div>
           </div>
-          <div class="d-card">
+          <div v-if="feat('module_notes')" class="d-card">
             <div class="d-card-h"><ico n="note" :s="15"></ico>Catatan internal</div>
             <textarea v-model="noteDraft" :disabled="!canEdit" placeholder="Tulis catatan tentang kandidat ini…"></textarea>
             <div class="row" style="margin-top:10px" v-if="canEdit"><div class="spacer"></div><button class="btn sm primary" :disabled="noteDraft===(cand.notes||'')" @click="saveNote(cand)">Simpan catatan</button></div>
           </div>
-          <div class="d-card">
+          <div v-if="feat('module_interviews')" class="d-card">
             <div class="d-card-h"><ico n="calendar" :s="15"></ico>Interview<div class="spacer"></div><button v-if="canEdit" class="btn sm" @click="edit('Interviews',{candidate_id:cand.id})"><ico n="plus" :s="14"></ico>Jadwalkan</button></div>
             <div v-if="!candInterviews.length" class="faint">Belum ada jadwal.</div>
             <div v-for="i in candInterviews" :key="i.id" class="iv">
@@ -612,7 +693,7 @@
               <div v-if="i.feedback" class="small pre" style="margin-top:4px;color:var(--text-2)">{{ i.feedback }}</div>
             </div>
           </div>
-          <div class="d-card" v-if="canEdit">
+          <div class="d-card" v-if="canEdit && feat('module_email_manual')">
             <div class="d-card-h"><ico n="mail" :s="15"></ico>Kirim email</div>
             <div class="field"><select v-model="mailTpl" @change="applyTpl"><option value="">Gunakan template…</option><option v-for="t in db.templates" :key="t.id" :value="t.id">{{ t.name }}</option></select></div>
             <div class="field"><input v-model="mail.subject" placeholder="Subjek"></div>
