@@ -60,10 +60,20 @@
   clasp push -f && clasp update-deployment AKfycbx45EcCwwrQ_h5WHycl2cYJz1hMmZYeWO-Spuzfl3Vi3GzR8QbILgVbuX_zOqs3V7NQ-g
   ```
 
+## Hosting frontend di Vercel
+Frontend juga bisa dibuka dari Vercel; backend & database tetap di Apps Script
+(dipanggil lewat `doPost`). Vercel menjalankan `node scripts/build-web.js`
+yang menggabungkan `src/*.html` menjadi `web/index.html`.
+
+- URL backend diatur lewat env `GAS_URL` (default: deployment di atas).
+- Setiap push ke `main` otomatis di-deploy ulang oleh Vercel.
+- Jika kode `src/Code.gs` berubah, tetap jalankan `clasp push` + `clasp update-deployment`.
+
 ## Pengujian lokal
 Simulasi Apps Script (Spreadsheet/Drive/Mail palsu) + uji browser Playwright:
 ```bash
 cd test && npm install
 node server.js        # buka http://localhost:8080
 node e2e.js shots     # di terminal lain
+# uji versi Vercel: GAS_URL=http://localhost:8080/rpc node ../scripts/build-web.js && WEB=1 node server.js
 ```

@@ -47,6 +47,19 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+/**
+ * Endpoint HTTP untuk frontend yang di-hosting di luar Apps Script (mis. Vercel).
+ * Frontend mengirim POST dengan Content-Type text/plain (tanpa preflight CORS)
+ * berisi JSON {action, data, token}; respons berupa JSON hasil api().
+ */
+function doPost(e) {
+  let req = {};
+  try { req = JSON.parse((e && e.postData && e.postData.contents) || '{}'); }
+  catch (err) { req = {}; }
+  return ContentService.createTextOutput(JSON.stringify(api(req)))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function include(name) {
   return HtmlService.createHtmlOutputFromFile(name).getContent();
 }

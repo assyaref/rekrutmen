@@ -99,6 +99,11 @@ http.createServer((req, res) => {
   }
   if (req.url === '/vue.js') { res.setHeader('Content-Type', 'text/javascript'); return res.end(fs.readFileSync(path.join(__dirname, 'node_modules/vue/dist/vue.global.prod.js'))); }
   if (req.url === '/_mails') { res.setHeader('Content-Type', 'application/json'); return res.end(JSON.stringify(mails)); }
+  if (process.env.WEB) { // uji build Vercel (web/index.html)
+    const w = fs.readFileSync(path.join(__dirname, '..', 'web', 'index.html'), 'utf8')
+      .replace('https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js', '/vue.js').replace(/<link[^>]+fonts[^>]+>/g, '');
+    res.setHeader('Content-Type', 'text/html'); return res.end(w);
+  }
   let html = include('Index').replace(/<\?!=\s*include\('(\w+)'\);?\s*\?>/g, (m, n) => include(n));
   html = html.replace('https://cdn.jsdelivr.net/npm/vue@3.4.38/dist/vue.global.prod.js', '/vue.js').replace(/<link[^>]+fonts[^>]+>/g, '');
   html = html.replace('<head>', '<head>' + shim);

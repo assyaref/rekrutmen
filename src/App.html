@@ -286,6 +286,7 @@
         const c = (s && s.primary_color) || '#4f46e5';
         document.documentElement.style.setProperty('--p', c);
         document.documentElement.style.setProperty('--p-soft', c + '14');
+        if (s && s.company_name) document.title = 'Karir · ' + s.company_name;
       },
       opts(s) { return String(s || '').split(/\n|,/).map(x => x.trim()).filter(Boolean); },
       optList(f) { return f.opt ? f.opt() : []; },
@@ -330,7 +331,7 @@
         });
       },
       copyJobLink(j) {
-        const base = this.db.appUrl || '';
+        const base = window.APP_URL || this.db.appUrl || '';
         const url = base + (base.includes('?') ? '&' : '?') + 'job=' + j.id;
         const done = () => this.notify('Link lowongan disalin', 'success');
         try { navigator.clipboard.writeText(url).then(done, () => prompt('Salin link:', url)); } catch (e) { prompt('Salin link:', url); }
