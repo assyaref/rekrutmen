@@ -21,6 +21,51 @@
     { v: 'select', l: 'Dropdown (pilih satu)' }, { v: 'radio', l: 'Pilihan ganda (radio)' }, { v: 'checkbox', l: 'Kotak centang (banyak)' },
   ];
   const ROLES = [{ v: 'admin', l: 'Admin' }, { v: 'recruiter', l: 'Recruiter' }, { v: 'viewer', l: 'Viewer' }];
+  const ICONS = {
+    grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/>',
+    briefcase: '<path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect x="2" y="6" width="20" height="14" rx="2"/>',
+    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+    calendar: '<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',
+    sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+    user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+    globe: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+    logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+    search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+    pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+    wallet: '<path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    refresh: '<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/>',
+    download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+    upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
+    link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+    edit: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>',
+    trash: '<path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+    x: '<path d="M18 6 6 18M6 6l12 12"/>',
+    up: '<path d="m18 15-6-6-6 6"/>', down: '<path d="m6 9 6 6 6-6"/>',
+    arrowRight: '<path d="M5 12h14M12 5l7 7-7 7"/>', arrowLeft: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
+    file: '<path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>',
+    mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+    star: '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    menu: '<path d="M4 6h16M4 12h16M4 18h16"/>',
+    external: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+    columns: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+    award: '<circle cx="12" cy="8" r="6"/><path d="M15.48 12.89 17 22l-5-3-5 3 1.52-9.11"/>',
+    send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+    note: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
+    activity: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+    lock: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+    alert: '<circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>',
+  };
+  const Ico = {
+    props: { n: String, s: { type: [Number, String], default: 16 }, fill: Boolean },
+    computed: { html() { return ICONS[this.n] || ''; } },
+    template: '<svg class="ico" :width="s" :height="s" viewBox="0 0 24 24" :fill="fill ? \'currentColor\' : \'none\'" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" v-html="html"></svg>',
+  };
   const MASTER_LABELS = { department: 'Departemen', location: 'Lokasi', job_type: 'Tipe Pekerjaan', source: 'Sumber Kandidat' };
 
   function call(action, data, token) {
@@ -45,7 +90,7 @@
     });
   }
 
-  createApp({
+  const app = createApp({
     template: '#tpl',
     data() {
       return {
@@ -70,22 +115,28 @@
           { id: 'fields', label: 'Form Lamaran' }, { id: 'master', label: 'Data Master' },
           { id: 'templates', label: 'Template Email' }, { id: 'users', label: 'Pengguna' },
         ],
+        settingGroups: [
+          { id: 'brand', title: 'Identitas perusahaan', desc: 'Nama, logo, dan warna utama yang dipakai di seluruh aplikasi.' },
+          { id: 'careers', title: 'Halaman karir', desc: 'Teks yang dilihat pelamar di halaman karir publik.' },
+          { id: 'form', title: 'Formulir lamaran', desc: 'Aturan upload CV dan tampilan informasi lowongan.' },
+          { id: 'email', title: 'Email & notifikasi', desc: 'Pengirim email otomatis dan notifikasi lamaran baru.' },
+        ],
         settingFields: [
-          { k: 'company_name', l: 'Nama Perusahaan' },
-          { k: 'tagline', l: 'Tagline' },
-          { k: 'logo_url', l: 'URL Logo', ph: 'https://…/logo.png', h: 'Gunakan link gambar publik.' },
-          { k: 'primary_color', l: 'Warna Utama', t: 'color' },
-          { k: 'careers_title', l: 'Judul Halaman Karir' },
-          { k: 'apply_button_text', l: 'Teks Tombol Lamar' },
-          { k: 'careers_intro', l: 'Teks Pembuka Halaman Karir', t: 'textarea' },
-          { k: 'success_message', l: 'Pesan Setelah Melamar', t: 'textarea' },
-          { k: 'cv_label', l: 'Label Upload CV' },
-          { k: 'footer_text', l: 'Teks Footer' },
-          { k: 'email_from_name', l: 'Nama Pengirim Email' },
-          { k: 'admin_notify_email', l: 'Email Notifikasi Admin', ph: 'hr@perusahaan.com', h: 'Dikirimi email setiap ada lamaran baru (pisahkan dengan koma). Kosongkan untuk menonaktifkan.' },
-          { k: 'cv_required', l: 'CV wajib diunggah', t: 'checkbox' },
-          { k: 'show_salary', l: 'Tampilkan gaji di halaman karir', t: 'checkbox' },
-          { k: 'email_notifications', l: 'Aktifkan email otomatis ke kandidat', t: 'checkbox' },
+          { g: 'brand', k: 'company_name', l: 'Nama Perusahaan' },
+          { g: 'brand', k: 'tagline', l: 'Tagline' },
+          { g: 'brand', k: 'logo_url', l: 'URL Logo', ph: 'https://…/logo.png', h: 'Link gambar publik. Kosongkan untuk memakai inisial.' },
+          { g: 'brand', k: 'primary_color', l: 'Warna Utama', t: 'color' },
+          { g: 'careers', k: 'careers_title', l: 'Judul Halaman Karir' },
+          { g: 'careers', k: 'apply_button_text', l: 'Teks Tombol Lamar' },
+          { g: 'careers', k: 'careers_intro', l: 'Teks Pembuka Halaman Karir', t: 'textarea' },
+          { g: 'careers', k: 'success_message', l: 'Pesan Setelah Melamar', t: 'textarea' },
+          { g: 'form', k: 'cv_label', l: 'Label Upload CV' },
+          { g: 'careers', k: 'footer_text', l: 'Teks Footer', full: true },
+          { g: 'email', k: 'email_from_name', l: 'Nama Pengirim Email' },
+          { g: 'email', k: 'admin_notify_email', l: 'Email Notifikasi Admin', ph: 'hr@perusahaan.com', h: 'Dikirimi email setiap ada lamaran baru (pisahkan dengan koma). Kosongkan untuk menonaktifkan.' },
+          { g: 'form', k: 'cv_required', l: 'CV wajib diunggah', t: 'checkbox' },
+          { g: 'form', k: 'show_salary', l: 'Tampilkan gaji di halaman karir', t: 'checkbox' },
+          { g: 'email', k: 'email_notifications', l: 'Aktifkan email otomatis ke kandidat', t: 'checkbox' },
         ],
       };
     },
@@ -95,11 +146,13 @@
       canEdit() { return this.user && ['admin', 'recruiter'].includes(this.user.role); },
       menu() {
         const m = [
-          { id: 'dashboard', label: 'Dashboard', icon: '📊' }, { id: 'jobs', label: 'Lowongan', icon: '💼' },
-          { id: 'candidates', label: 'Kandidat', icon: '👥' }, { id: 'interviews', label: 'Interview', icon: '📅' },
+          { id: 'dashboard', label: 'Dashboard', icon: 'grid' },
+          { id: 'jobs', label: 'Lowongan', icon: 'briefcase', count: this.db.jobs.filter(j => j.status === 'Open').length },
+          { id: 'candidates', label: 'Kandidat', icon: 'users', count: this.db.candidates.length },
+          { id: 'interviews', label: 'Interview', icon: 'calendar', count: this.upcomingInterviews.length },
         ];
-        if (this.isAdmin) m.push({ id: 'settings', label: 'Pengaturan', icon: '⚙️' });
-        m.push({ id: 'account', label: 'Akun Saya', icon: '👤' });
+        if (this.isAdmin) m.push({ id: 'settings', label: 'Pengaturan', icon: 'sliders' });
+        m.push({ id: 'account', label: 'Akun Saya', icon: 'user' });
         return m;
       },
       pubJobs() {
@@ -162,7 +215,7 @@
             { k: 'department', l: 'Departemen', t: 'combo', opt: mv('department') },
             { k: 'location', l: 'Lokasi', t: 'combo', opt: mv('location') },
             { k: 'type', l: 'Tipe Pekerjaan', t: 'combo', opt: mv('job_type') },
-            { k: 'status', l: 'Status', t: 'select', req: true, opt: () => vm.jobStatuses.map(s => ({ v: s, l: s })), h: 'Hanya status "Open" yang tampil di halaman karir.' },
+            { k: 'status', l: 'Status', t: 'select', req: true, opt: () => vm.jobStatuses.map(s => ({ v: s, l: vm.statusLabel(s) })), h: 'Hanya lowongan berstatus Dibuka yang tampil di halaman karir.' },
             { k: 'salary', l: 'Rentang Gaji', ph: 'Rp 5.000.000 - Rp 7.000.000' },
             { k: 'quota', l: 'Kebutuhan (orang)', t: 'number' },
             { k: 'deadline', l: 'Batas Lamaran', t: 'date', h: 'Kosongkan jika tidak ada batas.' },
@@ -296,6 +349,15 @@
       roleLabel(r) { return (ROLES.find(x => x.v === r) || {}).l || r; },
       fieldTypeLabel(t) { return (FIELD_TYPES.find(x => x.v === t) || {}).l || t; },
       triggerLabel(t) { return (this.triggerOptions.find(x => x.v === t) || {}).l || t; },
+      statusLabel(s) { return { Open: 'Dibuka', Closed: 'Ditutup', Draft: 'Draf' }[s] || s; },
+      ivCls(s) { return s === 'Selesai' ? 'b-open' : s === 'Dibatalkan' || s === 'Tidak Hadir' ? 'b-closed' : 'b-warn'; },
+      initials(n) { const w = String(n || '?').trim().split(/\s+/).filter(Boolean); return ((w[0] || '?')[0] + (w.length > 1 ? w[w.length - 1][0] : '')).toUpperCase(); },
+      firstName(n) { return String(n || '').trim().split(/\s+/)[0] || ''; },
+      avStyle(n) { let h = 0; String(n || '').split('').forEach(c => { h = (h * 31 + c.charCodeAt(0)) % 360; }); return { '--h': h }; },
+      monthShort(v) { const d = parseD(v); return d ? MONTHS[d.getMonth()] : ''; },
+      dayNum(v) { const d = parseD(v); return d ? d.getDate() : ''; },
+      timeOf(v) { const d = parseD(v); return d ? pad(d.getHours()) + ':' + pad(d.getMinutes()) : ''; },
+      fmtSize(b) { return b > 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB'; },
       statusCls(s) { return s === 'Open' ? 'b-open' : s === 'Closed' ? 'b-closed' : 'b-draft'; },
       fmtDate(v) { const d = parseD(v); return d ? d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear() : ''; },
       fmtDateTime(v) { const d = parseD(v); return d ? this.fmtDate(v) + ', ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) : ''; },
@@ -489,6 +551,8 @@
         await this.run(async () => { await this.api('changePassword', { old: this.pw.old, new: this.pw.new }); this.pw = { old: '', new: '', new2: '' }; }, 'Password diganti');
       },
     },
-  }).mount('#app');
+  });
+  app.component('ico', Ico);
+  app.mount('#app');
 })();
 </script>
