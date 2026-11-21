@@ -96,7 +96,7 @@
     template: '#tpl',
     data() {
       return {
-        booting: true, busy: false, logoErr: false, logoData: '', logoTried: false, view: 'careers', toast: null, sideOpen: false,
+        booting: true, busy: false, logoErr: false, logoData: '', logoTried: false, logoFallback: false, view: 'careers', toast: null, sideOpen: false,
         pub: { settings: {}, jobs: [], fields: [], masters: [], appUrl: '' },
         cf: { q: '', dept: '', loc: '', type: '' },
         cj: null, applied: false, af: this.blankApply(),
@@ -193,11 +193,20 @@
         this.pub.jobs.forEach(j => { if (j.department) m[j.department] = (m[j.department] || 0) + 1; });
         return Object.keys(m).sort().map(name => ({ name, count: m[name] }));
       },
+      driveLogoId() {
+        const m = String(this.S.logo_url || '').match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=|thumbnail\?id=)([\w-]{20,})/);
+        return m ? m[1] : '';
+      },
       logoSrc() {
         if (this.logoData) return this.logoData;
-        const u = String(this.S.logo_url || '').trim();
-        const m = u.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([\w-]{20,})/);
-        return m ? 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400' : u;
+        // Logo Drive diambil lewat backend (PNG asli, transparansi terjaga). Thumbnail Drive hanya cadangan
+        // karena thumbnail mengubah latar transparan menjadi hitam.
+        if (this.driveLogoId) return this.logoFallback ? 'https://drive.google.com/thumbnail?id=' + this.driveLogoId + '&sz=w600' : '';
+        return String(this.S.logo_url || '').trim();
+      },
+      logoState() {
+        if (this.logoErr || !String(this.S.logo_url || '').trim()) return 'none';
+        return this.logoSrc ? 'img' : 'loading';
       },
       todayLabel() { const d = new Date(); return ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][d.getDay()] + ', ' + this.fmtDate(d.toISOString()); },
       new7() { const t = Date.now() - 7 * 864e5; return this.db.candidates.filter(c => (parseD(c.created_at) || 0) >= t).length; },
@@ -391,14 +400,20 @@
     },
     methods: {
       isTrue,
-      async onLogoError() {
-        // Gambar Drive gagal dimuat (mis. file tidak publik) → ambil lewat backend Apps Script
-        if (!this.logoTried && /drive\.google\.com/.test(String(this.S.logo_url || ''))) {
-          this.logoTried = true;
-          try { const uri = await call('logo'); if (uri) { this.logoData = uri; return; } } catch (e) {}
-        }
-        this.logoErr = true;
+      async loadLogo() {
+        const id = this.driveLogoId;
+        if (!id || this.logoTried) return;
+        this.logoTried = true;
+        const key = 'rec_logo_' + id;
+        const cached = LS.get(key);
+        if (cached) { this.logoData = cached; return; }
+        try {
+          const uri = await call('logo');
+          if (uri) { this.logoData = uri; LS.set(key, uri); return; }
+        } catch (e) {}
+        this.logoFallback = true;
       },
+      onLogoError() { this.logoErr = true; },
       feat(k) { const v = this.S[k]; return v === undefined || v === '' ? true : String(v).toLowerCase() !== 'false'; },
       async toggleFeature(k) {
         const val = this.feat(k) ? 'false' : 'true';
@@ -445,7 +460,10 @@
         // Warna terang (mis. kuning): teks di atas warna utama jadi gelap, teks berwarna dibuat lebih pekat
         root.setProperty('--p-on', lum > 0.45 ? '#1c1917' : '#ffffff');
         root.setProperty('--p-ink', lum > 0.45 ? 'color-mix(in srgb,' + c + ' 52%,#000)' : lum > 0.25 ? 'color-mix(in srgb,' + c + ' 75%,#000)' : c);
-        if (s && s.logo_url !== this._logoUrl) { this._logoUrl = s.logo_url; this.logoErr = false; this.logoData = ''; this.logoTried = false; }
+        if (s && s.logo_url !== this._logoUrl) {
+          this._logoUrl = s.logo_url; this.logoErr = false; this.logoData = ''; this.logoTried = false; this.logoFallback = false;
+          this.$nextTick(() => this.loadLogo());
+        }
         if (s && s.company_name) document.title = 'Karir · ' + s.company_name;
       },
       opts(s) { return String(s || '').split(/\n|,/).map(x => x.trim()).filter(Boolean); },

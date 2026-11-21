@@ -10,9 +10,10 @@
       <div class="c-container">
         <div class="c-top-in">
           <div class="c-brand-wrap">
-            <img v-if="logoSrc && !logoErr" :src="logoSrc" @error="onLogoError" class="logo-img" alt="">
+            <span v-if="logoState==='img'" class="logo-plate"><img :src="logoSrc" @error="onLogoError" :alt="S.company_name"></span>
+            <span v-else-if="logoState==='loading'" class="logo-plate skel"></span>
             <span v-else class="logo-mark">{{ initials(S.company_name) }}</span>
-            <span class="c-brand">{{ S.company_name }}</span>
+            <span class="c-brand" :class="{'with-logo':logoState!=='none'}">{{ S.company_name }}</span>
           </div>
           <div class="spacer"></div>
           <button class="btn glass sm" @click="goAdmin"><ico n="lock" :s="14"></ico>Masuk Admin</button>
@@ -192,7 +193,8 @@
   <div v-else-if="view==='login'" class="login">
     <div class="login-art">
       <div class="row" style="gap:12px">
-        <img v-if="logoSrc && !logoErr" :src="logoSrc" @error="onLogoError" class="logo-img" style="background:#fff;padding:3px" alt="">
+        <span v-if="logoState==='img'" class="logo-plate"><img :src="logoSrc" @error="onLogoError" :alt="S.company_name"></span>
+        <span v-else-if="logoState==='loading'" class="logo-plate skel"></span>
         <span v-else class="logo-mark lg">{{ initials(S.company_name) }}</span>
         <b style="font-size:16px">{{ S.company_name }}</b>
       </div>
@@ -224,9 +226,9 @@
     </div>
     <aside class="side" :class="{open:sideOpen}">
       <div class="side-brand">
-        <img v-if="logoSrc && !logoErr" :src="logoSrc" @error="onLogoError" class="logo-img" alt="">
-        <span v-else class="logo-mark">{{ initials(S.company_name) }}</span>
-        <span>{{ S.company_name || 'Rekrutmen' }}</span>
+        <span v-if="logoState==='img'" class="logo-plate" :title="S.company_name"><img :src="logoSrc" @error="onLogoError" :alt="S.company_name"></span>
+        <span v-else-if="logoState==='loading'" class="logo-plate skel"></span>
+        <template v-else><span class="logo-mark">{{ initials(S.company_name) }}</span><span>{{ S.company_name || 'Rekrutmen' }}</span></template>
       </div>
       <nav class="nav">
         <div class="nav-label">Menu</div>

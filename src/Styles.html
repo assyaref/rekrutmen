@@ -97,6 +97,15 @@ input[type=date],input[type=datetime-local]{padding-right:8px}
 .logo-mark{width:30px;height:30px;border-radius:8px;background:var(--p);color:var(--p-on);display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;letter-spacing:.02em}
 .logo-mark.lg{width:48px;height:48px;border-radius:12px;font-size:18px}
 .logo-img{height:30px;width:auto;max-width:140px;object-fit:contain;border-radius:6px}
+/* Pelat logo: latar putih bersih agar logo apa pun (transparan/gelap) tampil rapi */
+.logo-plate{display:inline-flex;align-items:center;justify-content:center;height:44px;padding:7px 14px;background:#fff;border-radius:11px;box-shadow:0 6px 18px -6px rgba(0,0,0,.28),0 0 0 1px rgba(0,0,0,.04);flex-shrink:0}
+.logo-plate img{display:block;height:100%;width:auto;max-width:180px;object-fit:contain}
+.logo-plate.skel{width:132px;background:rgba(255,255,255,.22);box-shadow:none;animation:skel 1.2s ease-in-out infinite}
+@keyframes skel{50%{opacity:.5}}
+.c-brand.with-logo{padding-left:14px;border-left:1px solid rgba(255,255,255,.32);line-height:1.25}
+.side-brand .logo-plate{height:40px;padding:6px 12px;border-radius:10px;box-shadow:none}
+.side-brand .logo-plate img{max-width:170px}
+.login-art .logo-plate{height:48px}
 
 /* Tables */
 .tbl-wrap{overflow:auto;border:1px solid var(--line);border-radius:var(--r-lg);background:var(--surface);box-shadow:var(--sh-1)}
@@ -181,7 +190,6 @@ table.tbl{width:100%;border-collapse:collapse}
 .c-brand-wrap{display:flex;align-items:center;gap:10px}
 .c-brand{font-weight:600;font-size:15.5px;letter-spacing:-.01em;color:#fff}
 .c-hero .logo-mark{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);backdrop-filter:blur(6px)}
-.c-hero .logo-img{background:#fff;padding:4px 6px;height:36px;border-radius:8px}
 .btn.glass{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.28);color:#fff;box-shadow:none;backdrop-filter:blur(6px)}
 .btn.glass:hover{background:rgba(255,255,255,.22);border-color:rgba(255,255,255,.45);color:#fff}
 .c-hero-body{padding-top:56px;max-width:760px}
@@ -275,6 +283,8 @@ table.tbl{width:100%;border-collapse:collapse}
 }
 @media (max-width:640px){
   .c-container{padding:0 16px}
+  .c-brand.with-logo{display:none}
+  .logo-plate{height:38px;padding:6px 11px}
   .c-hero{padding-bottom:96px}
   .c-hero-body{padding-top:32px}
   .c-hero h1{font-size:30px}
@@ -409,7 +419,6 @@ code{background:var(--subtle);border:1px solid var(--line-2);padding:0 6px;borde
 .layout{--p-deep:color-mix(in srgb,var(--p) 22%,#0b1020);--p-end:color-mix(in srgb,var(--p) 82%,#0b1026);--series-1:#2a78d6;--series-2:#eb6834;--series-3:#1baf7a;--series-4:#eda100;--series-5:#e87ba4;--series-6:#6250d6}
 .side{background:linear-gradient(180deg,var(--p-deep) 0%,#0b1020 100%);border-right:none;color:#cbd5e1}
 .side-brand{color:#fff;padding:20px 18px 16px}
-.side .logo-img{background:#fff;padding:3px 5px;border-radius:7px}
 .nav-label{color:rgba(255,255,255,.38)}
 .nav a{color:rgba(255,255,255,.72)}
 .nav a .ico{color:rgba(255,255,255,.45)}

@@ -64,6 +64,7 @@ const ctx = {
   PropertiesService: { getScriptProperties: () => ({ getProperty: k => props.get(k) || null, setProperty: (k, v) => props.set(k, v) }) },
   LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
   Utilities: {
+    base64Encode: a => Buffer.from(a.map(x => x & 255)).toString('base64'),
     getUuid: () => crypto.randomUUID(),
     DigestAlgorithm: { SHA_256: 'sha256' }, Charset: { UTF_8: 'utf8' },
     computeDigest: (alg, s) => [...crypto.createHash('sha256').update(s, 'utf8').digest()].map(b => (b > 127 ? b - 256 : b)),
@@ -77,7 +78,8 @@ const ctx = {
     sleep: () => {},
   },
   Session: { getScriptTimeZone: () => 'Asia/Jakarta' },
-  DriveApp: { getFolderById: () => folder('root'), getFileById: id => ({ setTrashed: () => { delete files[id]; } }) },
+  DriveApp: { getFolderById: () => folder('root'), getFileById: id => ({ setTrashed: () => { delete files[id]; },
+    getBlob: () => { const b = fs.readFileSync(path.join(__dirname, 'logo-test.png')); return { getBytes: () => [...b], getContentType: () => 'image/png' }; } }) },
   MailApp: { sendEmail: o => { mails.push(o); console.log('[MAIL]', o.to, '|', o.subject); } },
   ScriptApp: { getService: () => ({ getUrl: () => 'http://localhost:8080/exec' }) },
   HtmlService: {},
