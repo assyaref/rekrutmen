@@ -61,7 +61,7 @@
   ```
 
 ## Hosting frontend di Vercel
-**URL:** https://rekrutmen-eta.vercel.app (admin: https://rekrutmen-eta.vercel.app/?page=admin)
+**URL:** https://rekrutmen-supraco.vercel.app (admin: https://rekrutmen-supraco.vercel.app/?page=admin)
 
 Frontend juga bisa dibuka dari Vercel; backend & database tetap di Apps Script
 (dipanggil lewat `doPost`). Vercel menjalankan `node scripts/build-web.js`
